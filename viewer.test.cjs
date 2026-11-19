@@ -287,5 +287,20 @@ vm.runInContext("load(m29)",context);
  vm.runInContext("selected=1;lastPanelKey='';time=6.5;draw();",context);txt=elem('unitFired').textContent;
  assert.match(txt,/fired so far: none/,'A unit with no recorded launches shows none');
  assert.match(txt,/Trigger down: 2\.5 s so far, 3\.0 s in mission/,'The player shows trigger time');
+ vm.runInContext("load(m29);",context);}{ // Unit Tracker kill list: timeline by default, swappable to cumulative counts by type or label
+ vm.runInContext(`
+ const ku=(id,type,code,label,player)=>({id,iconType:type,iconTypeCode:code,recordedLabel:label,isPlayer:!!player,isWingman:false,startTime:0,tracks:{position:[[0,id*200,0,1000,0],[20,id*200+500,0,1000,0]],quaternion:[[0,0,0,0,1,0]],state:[[0,player?131:67]]}});
+ const ke=(t,v)=>({t,type:'destroyed',unitId:v,position:[v*200,0,1000],attacker:{unitId:1,weapon:'gun',confidence:'inferred-aim'}});
+ load({schema:'ac8-tactical-replay',schemaVersion:1,source:{file:'killview-test'},mission:{MissionID:99},duration:20,
+  events:[ke(2,2),ke(4,3),ke(6,4),ke(8,5),ke(10,6)],
+  units:[ku(1,'Air',1,'F-16C',true),ku(2,'Air',1,'A-6E'),ku(3,'Air',1,'A-6E'),ku(4,'Air',1,'F-4E'),ku(5,'BuildingParent',9,'DESTROYER'),ku(6,'Ground',5,'TANK')]});
+ selected=1;trackerId=null;lastPanelKey='';time=7;draw();`,context);
+ const rowsText=()=>[...elem('unitKillList').children].map(li=>li.textContent||[...li.children].map(c=>c.textContent).join(' ')).join(' | ');
+ assert.equal(elem('unitKillList').children.length,5,'Timeline is the default: one row per kill');
+ const btn=v=>elem('kv-'+v);
+ btn('label').onclick();assert.match(rowsText(),/A-6E.*2 \/ 2/,'By label groups A-6E');assert.match(rowsText(),/F-4E.*1 \/ 1/,'...and F-4E');assert.ok(!/DESTROYER/.test(rowsText()),'Kills after the clock (8 s and later) are not counted yet');assert.match(rowsText(),/Total.*3 \/ 5/,'Total is so far / in mission');
+ btn('type').onclick();assert.match(rowsText(),/Aircraft.*3 \/ 3/,'By type groups the aircraft');
+ vm.runInContext('time=11;draw();',context);assert.match(rowsText(),/Ships.*1 \/ 1/,'Ships appear once their kill is reached');assert.match(rowsText(),/Ground vehicles.*1 \/ 1/,'Ground vehicles appear too');assert.match(rowsText(),/Total.*5 \/ 5/,'Cumulative total grows with the clock');
+ btn('timeline').onclick();assert.equal(elem('unitKillList').children.length,5,'Swapping back restores the timeline');
  vm.runInContext("load(m29);",context);}const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
 fs.writeFileSync(path.join(__dirname,'viewer-validation.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
