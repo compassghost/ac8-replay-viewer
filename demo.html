@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ACE COMBAT 8 Replay Viewer - Demo</title>
+<style>
+  :root{--bg:#0b1118;--panel:#121b26;--line:#233244;--text:#dbe6f1;--dim:#8fa3b8;--accent:#4aa3ff;--ok:#6fe08a}
+  @media (prefers-color-scheme:light){:root{--bg:#f3f6fa;--panel:#fff;--line:#d3dce6;--text:#16222f;--dim:#55677a;--accent:#0a64c8;--ok:#1b8a3a}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,Segoe UI,sans-serif}
+  main{max-width:880px;margin:0 auto;padding:40px 16px 64px}
+  h1{font-size:1.9rem;margin:0 0 6px}
+  h2{font-size:1.2rem;margin:34px 0 10px}
+  p{margin:0 0 12px}
+  .lead{color:var(--dim);font-size:1.05rem}
+  .cta{display:inline-block;margin:10px 10px 0 0;padding:10px 18px;border-radius:6px;background:var(--accent);color:#fff;text-decoration:none;font-weight:600}
+  .cta.alt{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+  .frame{margin-top:22px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+  .frame iframe{display:block;width:100%;height:520px;border:0}
+  .frame .bar{padding:8px 12px;font-size:.85rem;color:var(--dim);border-bottom:1px solid var(--line)}
+  ol.steps{list-style:none;counter-reset:s;margin:0;padding:0}
+  ol.steps li{counter-increment:s;position:relative;margin:0 0 12px;padding:14px 14px 14px 56px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+  ol.steps li::before{content:counter(s);position:absolute;left:14px;top:12px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;text-align:center;line-height:28px;font-weight:700}
+  code,pre{font-family:Consolas,Menlo,monospace;font-size:.88rem}
+  pre{margin:8px 0 0;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow-x:auto}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .card{padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+  .card b{color:var(--ok)}
+  .note{color:var(--dim);font-size:.88rem;margin-top:34px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<main>
+  <h1>ACE COMBAT 8 Replay Viewer</h1>
+  <p class="lead">A self-service tactical replay viewer. Convert <em>your own</em> replay saves on your own computer, then watch them in 3D with kill tracking and projectiles. Nothing is uploaded anywhere.</p>
+  <a class="cta" href="index.html">Open the viewer (sample mission)</a>
+  <a class="cta alt" href="#how">How to use your own replays</a>
+
+  <div class="frame">
+    <div class="bar">Live demo: Mission 1 (4:33). Press Play, click a marker, or open <b>Unit Tracker</b> to follow kills.</div>
+    <iframe src="index.html" title="Replay viewer demo" loading="lazy"></iframe>
+  </div>
+
+  <h2>What you get</h2>
+  <div class="grid">
+    <div class="card"><b>3D and top-down</b><br>Orbit, zoom, follow the pilot, or let the camera frame the fight.</div>
+    <div class="card"><b>Kill tracking</b><br>Who destroyed what, with a jump-to-kill list for every unit.</div>
+    <div class="card"><b>Projectiles and components</b><br>Missiles and gun rounds, plus ship guns and cells, switched on in Display Settings.</div>
+    <div class="card"><b>Video export</b><br>Frame a shot in the Capture panel and render an MP4 offline.</div>
+  </div>
+
+  <h2 id="how">Use your own replays</h2>
+  <p>The viewer is self-service: you bring the save, your machine does the conversion.</p>
+  <ol class="steps">
+    <li><b>Download this package</b> and unzip it. You need Python 3.10+ (no extra packages).</li>
+    <li><b>Convert a save.</b> Replays live in <code>%LOCALAPPDATA%\BANDAI NAMCO Entertainment\ACE COMBAT 8\Saved\SaveGames</code>. The original is never modified.
+<pre>python ac8_replay.py "...\Replay5.sav" --export Replay5.json
+python attribute_kills.py "...\Replay5.sav" Replay5.json
+python add_missiles.py "...\Replay5.sav" Replay5.json
+python round_export.py Replay5.json --no-backup
+python build_index.py --default Replay5.json</pre></li>
+    <li><b>Serve and open.</b>
+<pre>python -m http.server 5678</pre>
+      Then browse to <code>http://localhost:5678/</code>. Or skip the server and use <b>Open replay JSON</b> in the viewer to load a converted file by hand.</li>
+  </ol>
+  <p>Mission number = Mission ID &minus; 1. See <code>RUNBOOK.md</code> for details and video rendering.</p>
+
+  <p class="note">Unofficial fan tool. Not affiliated with or endorsed by BANDAI NAMCO. ACE COMBAT is a trademark of its owner. Kill credit is inferred from projectile geometry and is not recorded by the game. This package contains only extracted telemetry for one sample mission; no game files.</p>
+</main>
+</body>
+</html>

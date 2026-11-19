@@ -1,0 +1,12 @@
+[
+ {
+  "file": "Replay12.json",
+  "missionId": 2,
+  "missionNumber": 1,
+  "mapPath": "/Game/Maps/Ingame/Mission002/PL_Mission002",
+  "duration": 273.401123046875,
+  "markers": 23,
+  "killAttribution": true,
+  "default": true
+ }
+]

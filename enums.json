@@ -1,0 +1,53 @@
+{
+  "ELiveBriefingDebriefingIconType": {
+    "DummyParent": 23,
+    "RDPalette": 22,
+    "MAX": 24,
+    "Drone2": 19,
+    "Drone1": 18,
+    "RDMissile": 21,
+    "LandAegis": 20,
+    "Nightmare": 15,
+    "SotoaRocket": 14,
+    "Triumphant": 17,
+    "Submarine": 16,
+    "LandBattleShip": 11,
+    "Podarge": 10,
+    "AirShip": 13,
+    "Ladon": 12,
+    "BuildingParent": 7,
+    "Building": 6,
+    "Weapons": 9,
+    "Attachment": 8,
+    "Naval": 3,
+    "AirParent": 2,
+    "Ground": 5,
+    "AircraftCarrier": 4,
+    "Air": 1,
+    "None": 0
+  },
+  "ELiveBriefingDebriefingIconSubType": {
+    "MAX": 8,
+    "Escort": 7,
+    "Enemy": 4,
+    "Ally": 3,
+    "Unknown": 6,
+    "EnemyTGT": 5,
+    "None": 0,
+    "Wingman": 2,
+    "Player": 1
+  },
+  "ELiveGameObjectUniqueType": {
+    "MAX": 10,
+    "Wingman": 9,
+    "EnemyNPC": 8,
+    "AllyNPC_OtherThanWingmen": 7,
+    "AllyNPC": 6,
+    "AnyNPC": 5,
+    "OtherPlayer": 4,
+    "LocalPlayer": 3,
+    "AnyPlayer": 2,
+    "ByName": 1,
+    "Any": 0
+  }
+}

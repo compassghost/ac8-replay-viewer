@@ -1,0 +1,163 @@
+# Tactical replay format notes
+
+Investigated 2026-11-18 against local ACE COMBAT 8 executable build 26002268 (Steam app 2288340), and 19 existing `SavedVersion=32` saves. All binary scalars below are little-endian. This is a reverse-engineered layout for this version, not an official format specification.
+
+## What is established
+
+The postmission tactical replay is driven by saved object telemetry. Native debriefing actors consume a replay data manager; icons are meshes and their trail uses `NS_DebriefingRibbon`. It is not a pre-rendered movie or a collection of sprite frames. A web viewer can consume the telemetry without recreating the full game engine.
+
+Static native inspection identifies the active object hash-table traversal and selection flags, and asset inspection identifies the debriefing icon/ribbon classes. Binary parsing and structural validation independently agree across all 19 saves. State meanings and some event meanings below are correlations, explicitly separated from structural fields.
+
+## Outer save and compression
+
+The file begins with Unreal `GVAS`. `ac8_replay.py` locates the `ReplayFileHeader` tagged property and parses the following property list, rather than hard-coding the variable-sized GVAS preamble. FString uses signed int32 length including the terminator: positive UTF-8 byte count, negative UTF-16LE code-unit count.
+
+Modern complete property tags contain FString name; a recursive type name tree (FString name, uint32 child count, children); uint32 serialized payload size; uint8 flags; optional uint32 array index (flag 1); optional 16-byte property GUID (flag 2); then the payload. `None` ends a property list. Flag 8 indicates native serialization, flag 16 carries a true Boolean, flag 32 is accepted; extension flag 4 is unsupported. The parser only implements the property shapes needed here. See the [CUE4Parse property-tag implementation](https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Assets/Objects/FPropertyTag.cs) for broader UE context.
+
+Relevant outer properties: `ReplayFileHeader`, `BufferSize`, `BufferFrontSize`, `BufferBackSize`, `bBufferCompressed`, `UncompressedBufferSize`, `Buffer`, `SavedVersion`. `Buffer` is a byte array with uint32 count preceding its bytes. Compressed buffers in these saves use a **raw LZ4 block**, without an LZ4 frame header. The supplied decoder checks match references, bounds and exact decoded length.
+
+`ReplayFileHeader` includes MissionID, LevelId, MapPath, GameDifficulty, TotalReplayTime, player plane information and other metadata. Preserve `MapPath`: mission IDs do not always equal physical mission-folder numbers. The converter exports selected mission metadata, not every header field; `--inspect` retains the parsed header.
+
+## Decoded buffer and virtual addresses
+
+Decoded bytes comprise a front record region, a compacted back record region, and a trailing tagged `LiveReplaySystemSaveGame` section. The trailing section includes `StringList` and `NamedHashToIDMap`; these are available through inspection.
+
+At byte zero the 16-byte buffer header contains four uint32 values:
+
+| Offset | Meaning |
+| --- | --- |
+| 0 | Front end, matching BufferFrontSize |
+| 4 | Virtual start address of the back region |
+| 8 | Root record virtual address |
+| 12 | Unresolved allocator/tail value |
+
+Native allocation uses a 96 MiB address space. A record pointer refers to a virtual address, not necessarily its compact file offset. Front addresses map directly; back addresses map to `BufferFrontSize + pointer - virtualBackStart`. `-1` is the linked-list sentinel. The converter indexes both physical regions and rejects pointers that do not refer to indexed record boundaries.
+
+Every record begins:
+
+| Offset | Type | Meaning |
+| --- | --- | --- |
+| 0 | uint16 | Record size in 8-byte units |
+| 2 | uint8 | Payload offset in 4-byte units |
+| 3 | uint8 | Record type |
+
+Timestamped track records additionally have int32 next at +4, int32 previous at +8, float32 seconds at +12. Many event records have int32 target object ID at +16, with payload at +20. Always use each record's own payload offset.
+
+## Active object table: critical pitfall
+
+The root record is type 2. Its payload contains 2048 signed int32 hash-bucket pointers (8192 bytes). Walk each bucket's type 3 object chain using +4 as the next pointer. **Do not scan all type 3 records and assume they are active.** The compacted back region can retain stale object headers from an earlier recording. Native enumeration follows the root table, and the converter does the same. Root +4 is not a reliable count of active objects.
+
+Each active type 3 object occupies 80 bytes:
+
+| Offset | Type | Meaning |
+| --- | --- | --- |
+| 4 | int32 | Next object in hash bucket |
+| 8 | int32 | Unresolved |
+| 12 | int32 | Object ID |
+| 16 | int32[8] | Channel heads; -1 means absent |
+| 48 | uint16 | Index into trailing StringList for recorded display label; 65535 means absent |
+| 50 | uint16 | Flags; debrief selection tests `flags & 0x21`; player tests `flags & 4` |
+| 52 | uint8 | Icon type enum |
+| 53 | uint8 | Category code; code 24 is special-cased as wingman in native code |
+| 54 | uint8[2] | Unresolved extra codes |
+| 56 | float64[3] | Icon offset, retained in native **centimeters** |
+
+The category code is **not** proven to be the exported `ELiveGameObjectUniqueType` enum. Do not map it using that unrelated enum. `enums.json` contains the recovered icon enum and subtype enum. Codes include Air=1, Naval=3, Ground=5, LandBattleShip=11, Drone1=18 and Drone2=19.
+
+## Object channels
+
+| Channel | Record types | Payload |
+| --- | --- | --- |
+| 0 | 232â€“233 | int32 parent ID, uint16 socket string index, uint16 unresolved |
+| 1 | 234â€“237 | Three float64 translation components |
+| 2 | 238â€“241 | Four float32 quaternion components x,y,z,w |
+| 3 | 242â€“245 | Three float64 auxiliary/relative translation components |
+| 4 | 246â€“249 | Four float32 auxiliary/relative quaternion components |
+| 5 | 250â€“251 | Complex player/flight state; not interpreted or exported |
+| 6 | Unresolved | No established interpretation |
+| 7 | 252â€“253 | uint32 state mask at payload start; remaining bytes unresolved |
+
+Translation is in Unreal centimeters; JSON converts track positions and event locations to meters. Raw Unreal X/Y are horizontal and Z is up. No latitude/longitude, north orientation or geographic origin has been recovered. Parent/socket composition is not implemented. Retain parent and auxiliary tracks for future reconstruction; treating every track as an independent world-space marker may misplace attached objects.
+
+Position samples occur around 5 Hz for the players in the four exported samples. Do not assume a fixed rate for all tracks. Timestamps are float32 seconds and may repeat at checkpoints or phase transitions. At equal timestamps the reference sampler keeps the last linked record. Normal record types 234/238/242/246 are treated as interpolation eligible; the remaining variants are conservatively exported as discontinuities. Exact variant semantics and native interpolation are unresolved.
+
+## State and events: confidence limits
+
+The exported state is always a raw uint32 mask. In sampled recordings:
+
+| Bit | Correlated interpretation |
+| --- | --- |
+| 0 | Existence; falling edge correlates with removal |
+| 1 | Alive; falling edge correlates with destruction |
+| 2 | Target designation |
+| 6 | Enemy affiliation |
+| 7 | Allied affiliation |
+
+Other bits remain unresolved. These are observations, not an exact native enum. Reference coloring uses this approximation. Record type 24 carries a float resembling health. Type 25 correlates with destruction, and type 29 carries a three-float64 location nearby in time. Across the four exported samples, all 119 falling-alive-bit events match type 25 and a nearby type 29 location. Exported destruction events are marked `confidence: correlated`; nearby location matching uses a 0.25-second window. No attacker, weapon or kill-credit association is established.
+
+The converter includes raw payload hex for selected-unit event records below 232 with an event-style header, excluding structural types 2â€“5 and high-volume type 149 player controls. It does not export every buffer byte or every channel. Original saves should remain the source of truth for further reverse engineering.
+
+## JSON interface, schema version 1
+
+Root: `schema="ac8-tactical-replay"`, `schemaVersion=1`, `source` (filename, SHA-256, savedVersion), `mission`, `duration` in seconds, `coordinates`, `units`, `events`, `healthEvents`, `rawUnitEvents`, `validation`, `warnings`.
+
+Each unit retains id, classIndex (legacy name for the label string index), flags, iconTypeCode, categoryCode, extraCodes and iconOffset, and adds labelStringIndex, recordedLabel, iconType, isPlayer, isWingman, startTime and tracks. Sample annotations may additionally provide displayName and nameSource; these are kept separate from the recorded label. **iconOffset alone retains centimeters**; position and relativePosition tracks and event positions are meters. Track rows:
+
+```text
+position / relativePosition:     [seconds, x, y, z, stepIntoSample]
+quaternion / relativeQuaternion: [seconds, x, y, z, w, stepIntoSample]
+parent:                         [seconds, parentId, socketStringIndex, unknown16]
+state:                          [seconds, rawBitMask]
+```
+
+`stepIntoSample=1` means hold the previous pose until this sample's timestamp, then jump. Before/after track bounds the supplied sampler clamps to endpoints; use state/lifetime logic to determine visibility. Linear translation and normalized shortest-arc SLERP are provided as practical reference behavior. They are not proven identical to the native decoder.
+
+Events contain time `t`, unitId, type (`destroyed` or `removed`), source and confidence; destruction may include position and recordTime. Raw events contain t, unitId, recordType and payloadHex. Health events include a correlated scalar value. Array samples preserve native precision in JSON number form; large coordinate offsets may benefit from a local rendering origin.
+
+## Native evidence anchors
+
+For the inspected executable, preferred image base is `0x140000000`. Static addresses are build-specific and some entry points jump to relocated bodies:
+
+| Address | Observed function/behavior |
+| --- | --- |
+| 0x147836d80 | Replay buffer initialization, 96 MiB capacity |
+| 0x147836e60 | Forward record allocation and packed record header |
+| 0x1478374f0 | Root record and 2048-bucket table initialization |
+| 0x147838a10 | Active object-table enumeration and debrief flag selection |
+| 0x14782e290 | Debriefing initialization calling enumeration |
+| 0x147831390 | Debriefing unit initialization |
+| 0x147833720 | Unit role selection; player flag and wingman category special case |
+| 0x147848080 | Unit registration |
+| 0x146df78a0 â†’ 0x158daf5c0 | Debrief decoder constructor; speed defaults 1, 3, 6, subject to asset settings |
+
+Relevant asset paths include `/Game/Maps/Menu/Briefing/PL_Debriefing`, `/Game/Blueprints/BriefingDebriefing/Debriefing/BP_DebriefingIcon`, `BP_DebriefingKillMarkManager`, `DA_BriefingDebriefingSettings`, and `/Game/BriefingDebriefing/Common/Icon/Niagara/NS_DebriefingRibbon`. Native classes include `ALiveDebriefingDecoder` and `ALiveDebriefingUnitActor`.
+
+## Remaining work for faithful reproduction
+
+Resolve absolute versus relative transform selection, parent socket transforms and icon offsets; recover exact checkpoint/teleport variant behavior and native interpolation; establish the full state mask and scripted visibility; recover dynamic label updates and remaining hash identities; align mission map geometry; recover exact icon scaling, trail fade and camera behavior; validate event semantics and kill credit across more missions and gameplay modes. The current toolkit supports an approximate telemetry viewer now, with these gaps explicit.
+
+Label lookup was corroborated in six exported saves. Mission 29 examples: index 36 TU-95, 37 MIG-29A, 38 MIRAGE 2000-5, 39 Noise, 40 TASHA, 238 TU-160, 468 B-1, 573 LITTLE BEE. Labels are recorded strings, not proof of a particular 3D mesh, and do not establish radar lock.
+
+
+## Name-source findings (2026-11-18)
+
+- The StringList is a mixed pool of recorded strings, not only display labels: map/IGC paths (`Mission 028`, `/Game/Maps/...`), weapon blueprints, actor names (`WingmanObj_00_Coster_0`, `WingmanUnit_00_Kate_0`, `WingmanObj_00_Tasha_0`, `AObj01_Air_0_av8b_1`, `EObj01_W1_Bomber_6_tu95_0`), voice/event IDs (`Wingman_Coster_Hit_Enemy`, `LIVE_Harrier_A/E/I`, `Harrier_I_Enemy_Lockon_Me`) and faction/squad tags (`Ally_Brand`, `Ally_Shark`, `Ally_Shilage`). Display labels (TU-95, Noise, TASHA, LITTLE BEE, SHADOW 22/ARES) are plain English literals in this pool, not localization keys, so they are not looked up from a game string table at replay time.
+- `NamedHashToIDMap` is a uint32 name-hash to replay object ID map (2855 entries in Mission 29; values include 21, 24, 27, 30, 801, 804, 2341). It very likely links actor names to objects (for example Coster, Tasha and the AV-8B actors). The hash function is not yet identified: CRC32, FNV, UE StrCrc32/Strihash/MemCrc32 and an attempted CityHash32 on the StringList did not match. It needs the native FName/FString hash routine from the executable.
+- `Wingman_Coster_*` and `WingmanObj_00_Coster_0` independently confirm that a wingman named Coster exists in Mission 29. `Harrier_I`, `LIVE_Harrier_A/E/I` suggest Harrier voices A, E, I, which map onto Jackpot 1, 5, 9 (letter positions 1, 5, 9). This is circumstantial until the hash map assigns objects to actor names.
+- State bit 4 (value 16) appears only in mask 91 (enemy bit plus bit 4), seen on F-4E at about 134 s and the four F-15Cs spawning at 264 s, which later become mask 139 (allied) at 324 s. The viewer treats bit 4 as unidentified (yellow); this is a correlation.
+
+## Projectile tracks and kill attribution (2026-11-18)
+
+- `objects()` returns every active record: Mission 29 has 17,978, but only 883 are debrief icon objects (flags `& 0x21`). Another 17,073 objects have `flags == 2`, no label, no state channel (7) and translation channels 1/3 with quaternions. They are **projectiles**: about 15,000 live roughly 1.5 s at roughly 1,100 m/s (gun rounds) and about 2,000 live 20-30 s (missiles). They are not exported by default.
+- A projectile's first sample is within about 5 m of its shooter at launch time. Of 342 destroyed vehicles in Mission 29, 327 had a projectile within 200 m at the destruction time; 325 events were attributed by `attribute_kills.py` (missiles 319, guns 6). The result is stored as `events[].attacker` with `confidence` `inferred-high` (miss under 50 m) or `inferred-low`.
+- This is a geometric inference, not a native kill-credit field. No explicit owner reference was found on the projectile records; channel 6 (present on about 2,000 projectiles) is still unresolved and is the best lead for a true owner/target link. Overlapping missiles, friendly fire and kills by wreckage/collision can be misattributed.
+- Re-run after any re-export: `python attribute_kills.py PATH\Replay3.sav Replay3.json`, then rebuild the viewer. Re-exporting also loses display names (see `label-evidence.json`).
+- Projectile objects linger at the impact point for several seconds after arriving, so a projectile being present at the moment of death is not proof of the killing blow. attacker.impactTime / secondsImpactToDeath record when the projectile first reached the victim; a gap above 2 s downgrades the event to inferred-low. In Mission 26 the CRUISER (object 18155) was hit by an AEGIS 17849 missile at 81.6 s (health event 131 to 127 at the same instant) but only destroyed at 87.9 s, 6.3 s later; it is the only such outlier among 67 missile/gun attributions there.
+
+- The player's own gun rounds are not recorded as projectile objects: Mission 28 has about 15,000 gun-round objects, launched by AI aircraft (F-15C, F-16C, F-4E, NOISE, JACKPOT 9 and others) but essentially none by REX, and Mission 2 has only 80 rounds, all from an enemy MIG-21BIS. For a gun-only player the projectile method therefore finds nothing. attribute_kills.py adds a fallback (confidence inferred-aim): an unattributed kill with the player within 1.5 km and within 10 degrees of the player's heading is credited to the player's guns. All 10 Mission 2 kills (two recordings) fit within 1.5 km and 5 degrees, matching the user's guns-only play; in Mission 28 it picks up 2 kills at 4-5 degrees.
+
+- Mission naming used by the user: user mission number = recorded MissionID minus 1 (MissionID 2 = M1 = Replay12/14, MissionID 3 = M2 = Replay13/15, MissionID 27 = M26 = Replay2, MissionID 29 = M28 = Replay3). StringList[0] and MapPath use a third numbering (e.g. Mission 002 for M1), so always go by MissionID.
+
+## Sections (scene cuts)
+
+Derived, not a native field. `detectSections` in `playback.mjs` finds times where the player's position jumps more than 2 km between two samples less than 1 s apart (scene transitions: the player and wingmen teleport, scene-specific units spawn and the rest end). Mission ID 30 (user M29) has cuts at 458.9 s and 465.3 s. `doc.sections` (array of start times in seconds) overrides detection if present. The viewer draws ticks on the timeline, has previous/next-section buttons, breaks trails at cuts and resets the dynamic camera.
