@@ -34,7 +34,7 @@ Mission numbers follow the game's mission numbering: **Mission number = Mission 
   (see `RUNBOOK.md`).
 - **Replay selector** (top right): switches between the replays listed in `replays.json`.
 
-Colours: blue = player/allies, red = enemies, yellow = unidentified, grey = scenery that is not a real target.
+Colours (matching the in-game replay): green = player/allies, orange-red = enemies, yellow = unidentified, grey = scenery that is not a real target.
 Aircraft are wireframe dorito shapes oriented by the recorded attitude; ground vehicles are cubes; ships with a recorded heading
 are pentagonal prisms. Red lines run from an attacker to its target for 10 s after a kill.
 
