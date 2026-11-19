@@ -10,6 +10,7 @@
   @media (prefers-color-scheme:light){:root{--bg:#f3f6fa;--panel:#fff;--line:#d3dce6;--text:#16222f;--dim:#55677a;--accent:#0a64c8;--ok:#1b8a3a}}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,Segoe UI,sans-serif}
+  a{color:var(--accent)}a:hover{color:var(--text)}
   main{max-width:880px;margin:0 auto;padding:40px 16px 64px}
   h1{font-size:1.9rem;margin:0 0 6px}
   h2{font-size:1.2rem;margin:34px 0 10px}
@@ -44,7 +45,7 @@
   <h2 id="how">Use your own replays</h2>
   <p>The viewer is self-service: you bring the save, your machine does the conversion.</p>
   <ol class="steps">
-    <li><b>Download this package</b> and unzip it. You need Python 3.10+ (no extra packages).</li>
+    <li><b><a href="https://github.com/compassghost/ac8-replay-viewer/archive/refs/heads/main.zip">Download this package</a></b> (a zip of the <a href="https://github.com/compassghost/ac8-replay-viewer">GitHub repository</a>) and unzip it. You need Python 3.10+ (no extra packages).</li>
     <li><b>Convert a save.</b> Replays live in <code>%LOCALAPPDATA%\BANDAI NAMCO Entertainment\ACE COMBAT 8\Saved\SaveGames</code>. The original is never modified. Make a copy of any replays so you don't lose them. The game automatically deletes old saves automatically!
 <pre>python ac8_replay.py "...\Replay5.sav" --export Replay5.json
 python attribute_kills.py "...\Replay5.sav" Replay5.json

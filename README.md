@@ -9,7 +9,7 @@ This package contains the viewer and two sample replays: **Mission 2** (Mission 
 
 ## Quick start
 
-You need Python 3.10 or newer (no extra packages). From this folder:
+Get the package with **Code > Download ZIP** at <https://github.com/compassghost/ac8-replay-viewer> and unzip it. You need Python 3.10 or newer (no extra packages). From the unzipped folder:
 
 ```powershell
 python -m http.server 5678
