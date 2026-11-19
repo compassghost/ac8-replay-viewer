@@ -1,5 +1,35 @@
 [
  {
+  "file": "Replay3.json",
+  "missionId": 29,
+  "missionNumber": 28,
+  "mapPath": "/Game/Maps/Ingame/Mission028/PL_Mission028",
+  "duration": 2067.98095703125,
+  "markers": 883,
+  "killAttribution": true,
+  "default": true
+ },
+ {
+  "file": "Replay12.json",
+  "missionId": 2,
+  "missionNumber": 1,
+  "mapPath": "/Game/Maps/Ingame/Mission002/PL_Mission002",
+  "duration": 273.401123046875,
+  "markers": 23,
+  "killAttribution": false,
+  "default": false
+ },
+ {
+  "file": "Replay14.json",
+  "missionId": 2,
+  "missionNumber": 1,
+  "mapPath": "/Game/Maps/Ingame/Mission002/PL_Mission002",
+  "duration": 268.202392578125,
+  "markers": 23,
+  "killAttribution": false,
+  "default": false
+ },
+ {
   "file": "Replay13.json",
   "missionId": 3,
   "missionNumber": 2,
@@ -7,7 +37,17 @@
   "duration": 421.9104919433594,
   "markers": 108,
   "killAttribution": true,
-  "default": true
+  "default": false
+ },
+ {
+  "file": "Replay15.json",
+  "missionId": 3,
+  "missionNumber": 2,
+  "mapPath": "/Game/Maps/Ingame/Mission003/PL_Mission003",
+  "duration": 390.8828430175781,
+  "markers": 108,
+  "killAttribution": false,
+  "default": false
  },
  {
   "file": "Replay7.json",
@@ -16,7 +56,107 @@
   "mapPath": "/Game/Maps/Ingame/Mission005/PL_Mission005",
   "duration": 315.73626708984375,
   "markers": 106,
+  "killAttribution": false,
+  "default": false
+ },
+ {
+  "file": "Replay20.json",
+  "missionId": 20,
+  "missionNumber": 19,
+  "mapPath": "/Game/Maps/Ingame/Mission020/PL_Mission020",
+  "duration": 872.4063720703125,
+  "markers": 160,
   "killAttribution": true,
+  "default": false
+ },
+ {
+  "file": "Replay21.json",
+  "missionId": 21,
+  "missionNumber": 20,
+  "mapPath": "/Game/Maps/Ingame/Mission021/PL_Mission021",
+  "duration": 845.148681640625,
+  "markers": 62,
+  "killAttribution": true,
+  "default": false
+ },
+ {
+  "file": "Replay5.json",
+  "missionId": 22,
+  "missionNumber": 21,
+  "mapPath": "/Game/Maps/Ingame/Mission022/PL_Mission022",
+  "duration": 954.96728515625,
+  "markers": 231,
+  "killAttribution": true,
+  "default": false
+ },
+ {
+  "file": "Replay8.json",
+  "missionId": 23,
+  "missionNumber": 22,
+  "mapPath": "/Game/Maps/Ingame/Mission023/PL_Mission023",
+  "duration": 376.0796203613281,
+  "markers": 144,
+  "killAttribution": true,
+  "default": false
+ },
+ {
+  "file": "Replay0.json",
+  "missionId": 24,
+  "missionNumber": 23,
+  "mapPath": "/Game/Maps/Ingame/Mission024/PL_Mission024",
+  "duration": 936.7998657226562,
+  "markers": 250,
+  "killAttribution": true,
+  "default": false
+ },
+ {
+  "file": "Replay1.json",
+  "missionId": 26,
+  "missionNumber": 25,
+  "mapPath": "/Game/Maps/Ingame/Mission025_2/PL_Mission025_2",
+  "duration": 1263.942626953125,
+  "markers": 474,
+  "killAttribution": true,
+  "default": false
+ },
+ {
+  "file": "Replay2.json",
+  "missionId": 27,
+  "missionNumber": 26,
+  "mapPath": "/Game/Maps/Ingame/Mission026/PL_Mission026",
+  "duration": 1038.274169921875,
+  "markers": 277,
+  "killAttribution": true,
+  "default": false
+ },
+ {
+  "file": "Replay10.json",
+  "missionId": 28,
+  "missionNumber": 27,
+  "mapPath": "/Game/Maps/Ingame/Mission027/PL_Mission027",
+  "duration": 619.7803955078125,
+  "markers": 456,
+  "killAttribution": true,
+  "default": false
+ },
+ {
+  "file": "Replay11.json",
+  "missionId": 30,
+  "missionNumber": 29,
+  "mapPath": "/Game/Maps/Ingame/Mission029/PL_Mission029",
+  "duration": 547.520263671875,
+  "markers": 34,
+  "killAttribution": true,
+  "default": false
+ },
+ {
+  "file": "Replay6.json",
+  "missionId": 31,
+  "missionNumber": 30,
+  "mapPath": "/Game/Maps/Ingame/Mission030/PL_Mission030",
+  "duration": 1272.952392578125,
+  "markers": 434,
+  "killAttribution": false,
   "default": false
  }
 ]

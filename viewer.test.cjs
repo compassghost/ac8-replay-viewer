@@ -273,5 +273,19 @@ vm.runInContext("load(m29)",context);
  setProj(true);vm.runInContext('time=3;draw();',context);assert.ok(strokes.includes('#ffd84a'),'Firing line drawn while firing with projectiles on');
  strokes.length=0;ctx.strokeStyle='#000';setProj(false);vm.runInContext('time=3;draw();',context);assert.ok(!strokes.includes('#ffd84a'),'Firing line is part of the projectile display: hidden when projectiles are off');
  vm.runInContext('time=5;',context);setProj(true);strokes.length=0;ctx.strokeStyle='#000';vm.runInContext('draw();',context);assert.ok(!strokes.includes('#ffd84a'),'No firing line when the trigger is up');ctx.stroke=origStroke;
+ vm.runInContext("load(m29);",context);}{ // Unit Tracker: projectiles fired, with bombs counted once and their submunitions listed
+ vm.runInContext(`
+ const fu=(id,player)=>({id,iconType:'Air',iconTypeCode:1,recordedLabel:player?'F-16C':'F-15C',isPlayer:player,isWingman:false,startTime:0,tracks:{position:[[0,id*100,0,1000,0],[10,id*100+500,0,1000,0]],quaternion:[[0,0,0,0,1,0]],state:[[0,id===1?131:67]]}});
+ load({schema:'ac8-tactical-replay',schemaVersion:1,source:{file:'fired-test'},mission:{MissionID:99},duration:10,events:[],
+  playerFire:{unitId:1,intervals:[[1,3],[6,7]]},
+  fire:{'2':{m:[2.5,8],b:[[4,5],[9,4]]}},
+  units:[fu(1,true),fu(2,false)]});
+ selected=2;lastPanelKey='';time=5;draw();`,context);
+ let txt=elem('unitFired').textContent;
+ assert.match(txt,/fired so far: 1 missile, 1 bomb \(5 submunitions\)/,'So-far counts follow the clock');assert.ok(!/gun/i.test(txt),'Gun rounds are not counted');
+ assert.match(txt,/In mission: 2 missiles, 2 bombs \(9 submunitions\)/,'Mission totals');
+ vm.runInContext("selected=1;lastPanelKey='';time=6.5;draw();",context);txt=elem('unitFired').textContent;
+ assert.match(txt,/fired so far: none/,'A unit with no recorded launches shows none');
+ assert.match(txt,/Trigger down: 2\.5 s so far, 3\.0 s in mission/,'The player shows trigger time');
  vm.runInContext("load(m29);",context);}const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
 fs.writeFileSync(path.join(__dirname,'viewer-validation.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));

@@ -28,8 +28,8 @@ Mission numbers follow the game's mission numbering: **Mission number = Mission 
 - **View:** *3D view* (orthographic, drag to orbit, scroll to zoom), *Top down*, *Reset view*.
 - **Camera dropdown:** Whole mission, Follow pilot, Dynamic (combat) (fits the combat-relevant area), Dynamic (target)
   (frames the selected aircraft and a locked target), Follow selected.
-- **Top left:** *Unit Info* (details for the selected unit, with Lock), *Unit Tracker* (search units, see their kills and who
-  destroyed them; clicking a kill jumps to 1 s before it and centres on the target), *Display Settings* (show projectiles, on by default and including the player's firing line; show components such as a ship's guns and missile cells, track component kills such as AA guns and turrets, and which units get name labels).
+- **Top left:** *Unit Info* (details for the selected unit, with Lock), *Unit Tracker* (search units, see their kills, who
+  destroyed them and how many missiles and bombs they fired; clicking a kill jumps to 1 s before it and centres on the target), *Display Settings* (show projectiles, on by default and including the player's firing line; show components such as a ship's guns and missile cells, track component kills such as AA guns and turrets, and which units get name labels).
 - **Capture:** draw a framing rectangle, set start/end markers and copy a command for the offline video renderer
   (see `RUNBOOK.md`).
 - **Replay selector** (top right): switches between the replays listed in `replays.json`.
