@@ -88,7 +88,7 @@ try {
 
   const started = Date.now();
   for (let i = 0; i < frames; i++) {
-    const url = await page.evaluate(`replayApi.frame(${from + i * step}, 'png', )`);
+    const url = await page.evaluate(`replayApi.frame(${from + i * step}, 'png', ${i / fps})`);
     const buf = Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
     if (!ffmpeg.stdin.write(buf)) await new Promise(r => ffmpeg.stdin.once('drain', r));
     if (i % 100 === 0 || i === frames - 1) {
