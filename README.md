@@ -5,7 +5,7 @@ It reads the replay save files the game already writes, converts them to JSON, a
 kill tracking, projectile display and an offline video renderer. It is read-only: it never touches the game, and the original
 `.sav` files are never modified.
 
-This package contains the viewer and one sample replay, **Mission 1** (Mission ID 2, 4:33).
+This package contains the viewer and two sample replays: **Mission 2** (Mission ID 3, 7:02, loads first) and **Mission 4** (Mission ID 5, 5:16). Pick between them in the replay selector.
 
 ## Quick start
 
@@ -20,7 +20,7 @@ Open <http://localhost:5678/> in Edge or Chrome. The sample replay loads by itse
 The page must be served over HTTP. Opening `index.html` directly from disk (`file://`) cannot fetch `replays.json`; use the
 **Open replay JSON** button there to load a file by hand.
 
-Mission numbers follow the game's mission numbering: **Mission number = Mission ID - 1** (Mission ID 2 is Mission 1).
+Mission numbers follow the game's mission numbering: **Mission number = Mission ID - 1** (Mission ID 3 is Mission 2).
 
 ## Using the viewer
 
@@ -38,6 +38,18 @@ Colours: blue = player/allies, red = enemies, yellow = unidentified, grey = scen
 Aircraft are wireframe dorito shapes oriented by the recorded attitude; ground vehicles are cubes; ships with a recorded heading
 are pentagonal prisms. Red lines run from an attacker to its target for 10 s after a kill.
 
+## Privacy and safety
+
+- **Everything runs locally.** The viewer is static files. It reads `replays.json` and the replay you pick from the same folder or
+  site, and **Open replay JSON** reads a file in your browser without uploading it.
+- **Enforced, not just promised.** The page carries a content security policy (`connect-src 'self'`), so the browser blocks any
+  request to another site. You can check it in the page source.
+- **Readable tooling.** The converters use only the Python standard library and never modify your `.sav` files. The optional video
+  renderer installs puppeteer-core and ffmpeg-static through `npm install`.
+- **Keep saves to yourself.** Convert them with the scripts here; don't send `.sav` files to third-party converters.
+- A hosted copy of this page (for example GitHub Pages) is only a preview of the sample missions. For your own replays, run the
+  package on your computer.
+
 ## What to keep in mind
 
 - Kill credit is **inferred** from projectile geometry. The save has no kill-credit field. Many kills have no identifiable
@@ -53,11 +65,11 @@ are pentagonal prisms. Red lines run from an attacker to its target for 10 s aft
 | `index.html` | The viewer (no replay embedded; loads `replays.json` over HTTP). |
 | `demo.html` | Landing page: embedded live demo and the self-service steps for using your own replays. |
 | `replays.json` | List of replays the selector offers. |
-| `Replay12.json` | The sample: Mission 1 (Mission ID 2). |
+| `Replay13.json`, `Replay7.json` | The samples: Mission 2 (Mission ID 3) and Mission 4 (Mission ID 5). |
 | `RUNBOOK.md` | Deploying, adding replays, rendering video, troubleshooting. |
 | `FORMAT.md` | Save and JSON format notes. |
 | `ac8_replay.py` and the other `.py` files | Convert saves to JSON, attribute kills, add projectiles, round, rebuild the viewer. |
 | `viewer.template.html`, `playback.mjs` | Viewer source; `build_viewer.py` combines them into `index.html`. |
 | `video-tools/` | Offline (headless) video renderer. |
 
-No game files, executables, archives or encryption keys are included. The sample JSON contains only extracted replay telemetry.
+No game files, executables, archives or encryption keys are included. The sample JSON files contain only extracted replay telemetry.

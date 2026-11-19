@@ -1,8 +1,8 @@
-# Builds dist\ac8-replay-viewer.zip: the viewer, tooling and ONE sample replay (Mission 1 = Mission ID 2 = Replay12).
-# The working exports in this folder are not touched: the sample is re-derived from the save in a staging copy.
-#   .\package.ps1 [-Sample Replay12] [-Saves <SaveGames folder>]
+# Builds dist\ac8-replay-viewer.zip: the viewer, tooling and two sample replays (Mission 2 = Replay13, default; Mission 4 = Replay7).
+# The working exports in this folder are not touched: the samples are re-derived from the saves in a staging copy.
+#   .\package.ps1 [-Sample Replay13,Replay7] [-Saves <SaveGames folder>]   (the first sample is the default)
 param(
-  [string]$Sample = 'Replay12',
+  [string[]]$Sample = @('Replay13', 'Replay7'),   # Mission 2 (default) and Mission 4
   [string]$Saves = "$env:LOCALAPPDATA\BANDAI NAMCO Entertainment\ACE COMBAT 8\Saved\SaveGames"
 )
 $ErrorActionPreference = 'Stop'
@@ -10,9 +10,10 @@ $root = $PSScriptRoot
 $name = 'ac8-replay-viewer'
 $stage = Join-Path $root "dist\$name"
 $zip = Join-Path $root "dist\$name.zip"
-$sav = Join-Path $Saves "$Sample.sav"
-if (-not (Test-Path $sav)) { throw "Save not found: $sav" }
-if (-not (Test-Path (Join-Path $root "$Sample.json"))) { throw "$Sample.json not found next to this script (export it first)." }
+foreach ($s in $Sample) {
+  if (-not (Test-Path (Join-Path $Saves "$s.sav"))) { throw "Save not found: $(Join-Path $Saves "$s.sav")" }
+  if (-not (Test-Path (Join-Path $root "$s.json"))) { throw "$s.json not found next to this script (export it first)." }
+}
 
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force $stage, "$stage\video-tools" | Out-Null
@@ -23,13 +24,16 @@ foreach ($f in $files) { Copy-Item (Join-Path $root $f) $stage }
 foreach ($f in 'render_video.mjs','package.json','package-lock.json') { Copy-Item (Join-Path $root "video-tools\$f") "$stage\video-tools" }
 
 # Sample replay: regenerate attribution/projectiles from the save, then round, all on the staging copy.
-Copy-Item (Join-Path $root "$Sample.json") $stage
+foreach ($s in $Sample) { Copy-Item (Join-Path $root "$s.json") $stage }
 Push-Location $stage
 try {
-  python attribute_kills.py $sav "$Sample.json"
-  python add_missiles.py $sav "$Sample.json"
-  python round_export.py "$Sample.json" --no-backup
-  python build_index.py --default "$Sample.json"
+  foreach ($s in $Sample) {
+    $sav = Join-Path $Saves "$s.sav"
+    python attribute_kills.py $sav "$s.json"
+    python add_missiles.py $sav "$s.json"
+    python round_export.py "$s.json" --no-backup
+  }
+  python build_index.py --default "$($Sample[0]).json"
   python build_viewer.py --out index.html
 } finally { Pop-Location }
 

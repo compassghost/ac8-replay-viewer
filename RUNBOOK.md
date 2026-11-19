@@ -67,7 +67,7 @@ Any aircraft with a `displayName` counts as "named" in Display Settings. Names a
 ```powershell
 cd video-tools
 npm install
-node render_video.mjs ..\Replay12.json --speed 20 --out ..\clip.mp4
+node render_video.mjs ..\Replay13.json --speed 20 --out ..\clip.mp4
 ```
 
 No visible browser window opens, and rendering is deterministic (frame-by-frame, not real time).
@@ -105,7 +105,7 @@ Edit `viewer.template.html` (not `index.html`, which is generated), then rebuild
 python build_viewer.py --out index.html
 ```
 
-By default no replay is embedded. `python build_viewer.py --embed Replay12.json --out index.html` makes a self-contained copy that
+By default no replay is embedded. `python build_viewer.py --embed Replay13.json --out index.html` makes a self-contained copy that
 also works from `file://` (the page grows by the size of the replay).
 
 ## 6. Troubleshooting

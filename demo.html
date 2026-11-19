@@ -27,6 +27,7 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
   .card{padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
   .card b{color:var(--ok)}
+  .safe{margin-top:22px;border-left:4px solid var(--ok);font-size:.95rem}
   .note{color:var(--dim);font-size:.88rem;margin-top:34px;border-top:1px solid var(--line);padding-top:14px}
 </style>
 </head>
@@ -34,11 +35,13 @@
 <main>
   <h1>ACE COMBAT 8 Replay Viewer</h1>
   <p class="lead">A self-service tactical replay viewer. Convert <em>your own</em> replay saves on your own computer, then watch them in 3D with kill tracking and projectiles. Nothing is uploaded anywhere.</p>
-  <a class="cta" href="index.html">Open the viewer (sample mission)</a>
+  <a class="cta" href="index.html">Open the viewer (sample missions)</a>
   <a class="cta alt" href="#how">How to use your own replays</a>
 
+  <div class="card safe"><b>Your replays stay on your computer.</b> Saves are converted locally by scripts you can read (Python standard library only), and the viewer runs in your browser without uploading anything. A content security policy in the page blocks requests to any other site. Don't send your <code>.sav</code> files to anyone else's converter. This hosted page is a preview of the sample missions; run the package locally for your own replays.</div>
+
   <div class="frame">
-    <div class="bar">Live demo: Mission 1 (4:33). Press Play, click a marker, or open <b>Unit Tracker</b> to follow kills.</div>
+    <div class="bar">Live demo: Mission 2 (7:02), with Mission 4 in the replay selector. Press Play, click a marker, or open <b>Unit Tracker</b> to follow kills.</div>
     <iframe src="index.html" title="Replay viewer demo" loading="lazy"></iframe>
   </div>
 
@@ -66,7 +69,7 @@ python build_index.py --default Replay5.json</pre></li>
   </ol>
   <p>Mission number = Mission ID &minus; 1. See <code>RUNBOOK.md</code> for details and video rendering.</p>
 
-  <p class="note">Unofficial fan tool. Not affiliated with or endorsed by BANDAI NAMCO. ACE COMBAT is a trademark of its owner. Kill credit is inferred from projectile geometry and is not recorded by the game. This package contains only extracted telemetry for one sample mission; no game files.</p>
+  <p class="note">Unofficial fan tool. Not affiliated with or endorsed by BANDAI NAMCO. ACE COMBAT is a trademark of its owner. Kill credit is inferred from projectile geometry and is not recorded by the game. This package contains only extracted telemetry for two sample missions; no game files.</p>
 </main>
 </body>
 </html>
