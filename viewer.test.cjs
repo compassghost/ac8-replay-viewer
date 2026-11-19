@@ -184,7 +184,7 @@ vm.runInContext("load(m29)",context);
  assert.ok(Math.abs(vm.runInContext("time",context)-Math.max(0,ev.t-1))<1e-9,'Jumps to 1 s before the kill');
  assert.equal(vm.runInContext("centerOn",context),ev.unitId,'Centers on the target (victim)');
  assert.equal(vm.runInContext("cameraTarget().unit.id",context),ev.unitId,'Camera follows the target');
- assert.equal(vm.runInContext("selected",context),21,'The tracker keeps its selected unit (list does not vanish)');
+ assert.equal(vm.runInContext("selected",context),ev.unitId,'Clicking a kill selects the victim, like clicking its marker');assert.ok(elem('unitKillList').children.length>0,'The tracker still lists the killer\'s kills (list does not vanish)');assert.equal(vm.runInContext("trackerId",context),21,'The tracker keeps browsing the killer');
  assert.match(vm.runInContext("capCommand()",context),new RegExp('--camera selected --unit '+ev.unitId+' '),'Capture command reproduces the centered camera');
  elem('follow').onchange();assert.equal(vm.runInContext("centerOn",context),null,'Changing the camera mode releases the lock');
  li.onclick();assert.equal(vm.runInContext("centerOn",context),ev.unitId);elem('viewReset').onclick();assert.equal(vm.runInContext("centerOn",context),null,'Reset view releases the lock');}
@@ -245,11 +245,30 @@ vm.runInContext("load(m29)",context);
  selected=1;time=2;draw();`,context);
  elem('lockTarget').onclick();
  vm.runInContext("selected=2;time=2;draw();",context);
- const txt=elem('selection').textContent;
+ const txt=elem('selection').textContent+'\n'+elem('lockedInfo').textContent;assert.match(elem('selection').textContent,/SELECTED/,'Selected block is labelled');assert.ok(!/LOCKED/.test(elem('selection').textContent),'Locked info is in its own block, below the Lock button');
  assert.match(txt,/SELECTED/,'Panel labels the selected unit');assert.match(txt,/LOCKED/,'Panel labels the locked unit');
  assert.match(txt,/Distance 4\.\d\d km|Distance [345],\d{3} m/,'Distance between selected and locked');
  assert.match(txt,/Relative speed 720 km\/h/,'Relative speed is the velocity difference (200 m/s = 720 km/h)');
- assert.equal(elem('clearLock').style.display,'','Clear lock button is offered');
- elem('clearLock').onclick();assert.ok(!/LOCKED/.test(elem('selection').textContent),'Clearing the lock returns to a single unit');
+ assert.equal(elem('clearRow').style.display,'','Clear lock row is offered, at the bottom');
+ elem('clearLock').onclick();assert.equal(elem('lockedInfo').style.display,'none','Clearing the lock hides the locked block');assert.ok(!/LOCKED/.test(elem('selection').textContent),'Clearing the lock returns to a single unit');
+ vm.runInContext("load(m29);",context);}{ // Unit Tracker clicks behave like marker clicks: they select the unit and open Unit Info (where Lock lives)
+ vm.runInContext("load(m29);time=0;",context);
+ const info=JSON.parse(vm.runInContext("JSON.stringify((()=>{const k=[...killMap.keys()].find(id=>unitMap.has(id)&&killMap.get(id).some(e=>unitMap.has(e.unitId)&&e.unitId!==id));const e=killMap.get(k).find(e=>unitMap.has(e.unitId));return {killer:k,victim:e.unitId,killerName:unitName(unitMap.get(k))};})())",context));
+ elem('selPanelClose').onclick();assert.equal(elem('selPanel').hidden,true,'Unit Info starts closed for this check');
+ elem('unitSearch').value='';vm.runInContext('renderSearch()',context);
+ let clicked=false;for(const li of elem('unitResults').children){li.onclick();if(vm.runInContext('selected',context)===info.killer){clicked=true;break;}}
+ assert.ok(clicked,'A tracker row selects its unit');assert.equal(elem('selPanel').hidden,false,'Picking a unit in the tracker opens Unit Info, like clicking a marker');
+ vm.runInContext("selected="+info.killer+";trackerId=null;lastPanelKey='';draw();",context);
+ const row=elem('unitKillList').children[0];assert.ok(row,'Killer has kill rows');row.onclick();
+ assert.ok(vm.runInContext("unitMap.has(selected)&&killMap.get("+info.killer+").some(e=>e.unitId===selected)",context),'Clicking a kill row selects the victim');
+ assert.equal(elem('selPanel').hidden,false,'...and shows it in Unit Info');
+ assert.equal(elem('unitName').textContent.split(' · ')[0],info.killerName,'The tracker keeps showing the killer whose kills are being browsed');
+ vm.runInContext("trackerId=null;load(m29);",context);}{ // Firing line: drawn from the nose only while the player's trigger is down
+ vm.runInContext(`
+ load({schema:'ac8-tactical-replay',schemaVersion:1,source:{file:'fire-test'},mission:{MissionID:99},duration:10,events:[],playerFire:{unitId:1,intervals:[[2,4]]},
+  units:[{id:1,iconType:'Air',iconTypeCode:1,recordedLabel:'F-16C',isPlayer:true,isWingman:false,startTime:0,tracks:{position:[[0,0,0,1000,0],[10,1000,0,1000,0]],quaternion:[[0,0,0,0,1,0]],state:[[0,131]]}}]});`,context);
+ assert.equal(vm.runInContext("firingAt(1)",context),false,'Trigger up before the burst');assert.equal(vm.runInContext("firingAt(3)",context),true,'Trigger down inside the burst');assert.equal(vm.runInContext("firingAt(5)",context),false,'Trigger up after the burst');
+ const nose=JSON.parse(vm.runInContext("JSON.stringify(noseDirection(units[0],3))",context));assert.ok(Math.abs(nose[0]-1)<1e-9&&Math.abs(nose[1])<1e-9,'Identity orientation points the nose along +X');
+ for(const t of [1,3,5]){vm.runInContext("time="+t+";draw();",context);}
  vm.runInContext("load(m29);",context);}const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
 fs.writeFileSync(path.join(__dirname,'viewer-validation.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
