@@ -26,3 +26,4 @@
 !video-tools/render_video.mjs
 !video-tools/package.json
 !video-tools/package-lock.json
+!*.overrides.json

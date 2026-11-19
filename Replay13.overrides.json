@@ -1,0 +1,5 @@
+[
+  {"victim": 901, "attacker": 26, "weapon": "gun", "note": "F-14D at 368.3 s: confirmed as a Rex gun kill by the player, who watched the in-game replay (Professor's missile also matched; Rex's nose was 11.9 degrees off the victim's position)"},
+  {"victim": 907, "attacker": 26, "weapon": "gun", "note": "F-14D at 368.8 s: confirmed as a Rex gun kill by the player (Professor's missile also matched; Rex's nose was 5.3 degrees off)"},
+  {"victim": 910, "attacker": 26, "weapon": "gun", "note": "F-14D at 326.4 s: confirmed as a Rex gun kill by the player (a Professor gun round matched at 82.6 m; Rex's nose was 25 degrees off)"}
+]

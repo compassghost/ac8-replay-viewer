@@ -51,6 +51,16 @@ Steps 2 and 3 re-derive their data each time, so they are safe to re-run. Step 4
 
 To validate a batch of saves: `python validate_replays.py <save folder>`.
 
+### Correcting kill credit
+
+Kill credit is inferred, so you can overrule it. Put a file named after the replay next to it, e.g. `Replay13.overrides.json`:
+
+```json
+[ { "victim": 901, "attacker": 26, "weapon": "gun", "note": "confirmed from the in-game replay" } ]
+```
+
+`attribute_kills.py` applies it last and marks those kills "confirmed" in the viewer. `victim` and `attacker` are unit IDs (the Unit Tracker and the JSON show them); add `"t": seconds` if a victim has several destruction events. Re-run steps 2-4 after editing it.
+
 ### Adding names
 
 Callsigns come from the save's recorded labels. To name an aircraft the save does not label, add a `displayName` to the unit in
@@ -125,8 +135,9 @@ also works from `file://` (the page grows by the size of the replay).
 
 - Kill credit rule: a kill is credited to the projectile whose flight ends at the moment of destruction. Earlier hits that only
   damaged the target, and projectile objects that merely linger after impact, do not win. The player's own gun rounds are not
-  recorded, so player gun kills are inferred from aim and are marked as such. A kill the player lined up (within 1.5 km and 10 degrees of
-  heading) also overrides a weak projectile match (a "low" confidence AI shot that missed by 100-200 m).
+  recorded, so player gun kills are inferred from aim and are marked as such. Where the save has a usable trigger record (Missions 1, 2 and 4), a player gun kill needs the trigger down at the moment of the kill and the nose within
+  10 degrees of the victim (5 degrees to overrule a decent projectile match); a kill with the trigger up is never credited to the player's guns.
+  Without trigger data the rule is aim only: nose within 5 degrees (3 degrees to overrule a decent match), over the 2 s before the kill.
 - Weapon label: a projectile that accelerates (by 15% or more over its flight) is a missile; a constant-speed one is a gun.
 - Slow, sparsely sampled shells (artillery) are kept for their whole flight; a projectile is only cut where it actually stops.
 - Units mounted on another unit (a ship's guns and missile cells, a tank's turret) are treated as parts of the parent: they get

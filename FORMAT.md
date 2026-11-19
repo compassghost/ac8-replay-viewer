@@ -161,3 +161,7 @@ Label lookup was corroborated in six exported saves. Mission 29 examples: index 
 ## Sections (scene cuts)
 
 Derived, not a native field. `detectSections` in `playback.mjs` finds times where the player's position jumps more than 2 km between two samples less than 1 s apart (scene transitions: the player and wingmen teleport, scene-specific units spawn and the rest end). Mission ID 30 (user M29) has cuts at 458.9 s and 465.3 s. `doc.sections` (array of start times in seconds) overrides detection if present. The viewer draws ticks on the timeline, has previous/next-section buttons, breaks trails at cuts and resets the dynamic camera.
+
+## Player trigger (record type 68)
+
+The player object carries type 68 records with a 4-byte payload: a first byte of 1 is a press and a first byte of 0 is a release (the other three bytes are a marker that differs per recording; a bare `00000000` also appears at release). In Missions 1, 2 and 4 the press and release counts match and the bursts line up with the player's gun kills, so `attribute_kills.py` reads them as the trigger and stores `playerFire.intervals` in the JSON. Missions 23 and 28 do not follow the pattern (one repeated value), so no trigger data is used there. This is an observation, not a documented field. Type 149 on the player is the flight-control stream (axes 25-31); it has no trigger channel.

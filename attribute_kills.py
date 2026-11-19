@@ -7,7 +7,7 @@ metres from its shooter at launch time; a destroyed unit usually has a projectil
 Usage: python attribute_kills.py Replay3.sav Replay3.json
 Adds events[].attacker = {unitId, weapon, projectileId, missDistance, launchDistance, confidence} to destroyed events.
 """
-import bisect, json, math, pathlib, sys
+import bisect, json, math, pathlib, struct, sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import ac8_replay as ac8
@@ -18,7 +18,9 @@ MAX_LAUNCH = 60.0     # metres, shooter to projectile first sample
 COLLATERAL_SECONDS = 6.0  # weak match this soon after a nearby kill is probably collateral
 COLLATERAL_METERS = 450.0
 PLAYER_GUN_METERS = 1500.0
-PLAYER_GUN_DEGREES = 10.0
+PLAYER_GUN_DEGREES = 5.0         # nose-to-victim angle needed when the projectile match is weak or absent
+PLAYER_GUN_STRONG_DEGREES = 3.0  # needed to overrule a decent projectile match
+PLAYER_GUN_LOOKBACK = 2.0        # seconds before death in which the nose may have been on the victim
 MAX_IMPACT_GAP = 2.0   # projectile objects linger after impact; a hit this long before death may not be the killing blow
 
 
@@ -101,7 +103,7 @@ def victim_position(victim, t, event):
     return event.get('position')
 
 
-def attribute(doc, projs):
+def attribute(doc, projs, fire=None):
     units = [u for u in doc['units'] if u['tracks']['position'] and u['iconType'] in VEHICLE_TYPES]
     by_id = {u['id']: u for u in units}
     for u in units:
@@ -166,7 +168,7 @@ def attribute(doc, projs):
         }
         found += 1
     mark_collateral(doc, victims)
-    mark_player_guns(doc, units, victims)
+    mark_player_guns(doc, units, victims, fire)
     for u in units:
         u.pop('_times', None)
     return found
@@ -197,10 +199,96 @@ def mark_collateral(doc, by_id):
                 'afterVictimId': prior['unitId'], 'distanceToEarlierKill': round(d), 'secondsAfter': round(event['t'] - prior['t'], 1),
             }
 
-def mark_player_guns(doc, units, by_id):
-    """The player's own gun rounds are NOT recorded as projectile objects (only AI rounds are). A kill with no
-    projectile match where the player is close and pointing straight at the victim is probably a player gun kill.
-    Validated on Mission 2, where the user confirms guns-only play and all 10 kills fit (<=1.5 km, <=5 degrees)."""
+FIRE_AFTER_SECONDS = 1.0    # a round fired just before release can still land this long after the burst ends
+FIRE_AIM_DEGREES = 10.0     # nose-to-victim angle needed while the trigger was down (weak or no projectile match)
+FIRE_AIM_DECENT_DEGREES = 5.0
+
+
+def player_fire_intervals(replay, player_id, duration):
+    """The player's trigger, from record type 68 on the player object: a press (first payload byte 1) followed by a release
+    (first byte 0). Seen in Missions 1, 2 and 4 with matching press/release counts. Returns [[start, end], ...] or None when
+    the recording does not follow that pattern (Missions 23 and 28 do not), so nothing is guessed."""
+    ev = []
+    for rec in replay.records.values():
+        if rec['type'] != 68 or rec['size'] < 24 or rec['payload'] + 4 > rec['size']:
+            continue
+        if struct.unpack_from('<i', replay.buffer, rec['offset'] + 16)[0] != player_id:
+            continue
+        t = struct.unpack_from('<f', replay.buffer, rec['offset'] + 12)[0]
+        raw = bytes(replay.buffer[rec['offset'] + rec['payload']:rec['offset'] + rec['payload'] + 4])
+        ev.append((t, raw))
+    ev.sort(key=lambda x: x[0])
+    presses = sum(1 for t, r in ev if r[0] == 1 and r != b'\x01\x00\x00\x00')
+    releases = sum(1 for t, r in ev if r[0] == 0 and r != b'\x00\x00\x00\x00')
+    if presses < 3 or abs(presses - releases) > max(2, 0.2 * presses):
+        return None
+    out, start = [], None
+    for t, r in ev:
+        if r[0] == 1 and r != b'\x01\x00\x00\x00':
+            if start is None:
+                start = t
+        elif r[0] == 0 and start is not None:
+            out.append([round(start, 3), round(t, 3)])
+            start = None
+    if start is not None:
+        out.append([round(start, 3), round(duration, 3)])
+    return out
+
+
+def firing_at(fire, t):
+    """The burst that covers time t (allowing a short tail for rounds in flight), or None."""
+    for a, b in fire or []:
+        if a - 0.1 <= t <= b + FIRE_AFTER_SECONDS:
+            return (a, b)
+    return None
+
+def nose_direction(unit, t):
+    """The aircraft's forward (+X) axis in world space at time t, from its recorded orientation (None if unknown)."""
+    rows = unit['tracks'].get('quaternion') or []
+    if not rows:
+        return None
+    i = bisect.bisect_right([r[0] for r in rows], t) - 1
+    x, y, z, w = rows[max(0, min(i, len(rows) - 1))][1:5]
+    n = math.sqrt(x * x + y * y + z * z + w * w)
+    if n < 1e-9:
+        return None
+    x, y, z, w = x / n, y / n, z / n, w / n
+    # (1,0,0) rotated by q is the first column of its rotation matrix
+    return (1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y))
+
+
+def player_aim(player, victim, event):
+    """Smallest angle (degrees) between the player's NOSE and the direction to the victim over the last
+    PLAYER_GUN_LOOKBACK seconds before death, restricted to moments within PLAYER_GUN_METERS. Guns fire along the nose,
+    which differs from the velocity vector in a turning fight. Returns (angle, distance) or None."""
+    t = event['t']
+    best = None
+    for k in range(int(PLAYER_GUN_LOOKBACK / 0.2) + 1):
+        tt = t - 0.2 * k
+        me = unit_position(player, tt)
+        vp = victim_position(victim, tt, event) or event.get('position')
+        nose = nose_direction(player, tt)
+        if not me or not vp or not nose:
+            continue
+        to = [vp[i] - me[i] for i in range(3)]
+        d = math.hypot(*to)
+        if d < 1e-6 or d > PLAYER_GUN_METERS:
+            continue
+        cos = max(-1.0, min(1.0, sum(a * b for a, b in zip(nose, to)) / d))
+        angle = math.degrees(math.acos(cos))
+        if best is None or angle < best[0]:
+            best = (angle, d)
+    return best
+
+
+def mark_player_guns(doc, units, by_id, fire=None):
+    """The player's own gun rounds are NOT recorded as projectile objects (only AI rounds are), and the save has no
+    trigger record. A kill where the player's nose was pointed at the victim shortly before it died, within gun range, is
+    inferred to be a player gun kill. Evidence needed depends on what the projectile match offers:
+      - no match, or a weak one (low confidence / collateral): nose within PLAYER_GUN_DEGREES
+      - a decent match that missed by >= 50 m: nose within PLAYER_GUN_STRONG_DEGREES
+      - a close match (< 50 m, high confidence): keep it, but note that the player was also lined up (alsoAimedByPlayer).
+    Validated on Mission 2 (guns-only play): every kill the user confirmed has the nose within 2.2 degrees at <= 1.5 km."""
     players = [u for u in units if u.get('isPlayer')]
     if not players:
         return
@@ -209,47 +297,87 @@ def mark_player_guns(doc, units, by_id):
         if event.get('type') != 'destroyed' or event['unitId'] not in by_id:
             continue
         prior = event.get('attacker')
-        # A weak projectile match (inferred-low, not collateral) does not beat a clear player gun shot: the player's rounds are
-        # invisible, so a 100-200 m "miss" by an AI missile is as likely to be a gun kill the player lined up.
-        if prior and not (prior['confidence'] == 'inferred-low' and prior['weapon'] != 'collateral' and prior['unitId'] != player['id']):
+        if prior and prior['unitId'] == player['id']:
             continue
         victim = by_id[event['unitId']]
         if victim is player:
             continue
-        t = event['t']
-        now, before = unit_position(player, t), unit_position(player, t - 0.5)
-        vpos = victim_position(victim, t - 0.2, event) or event.get('position')
-        if not now or not before or not vpos:
+        if fire is not None and not firing_at(fire, event['t']):
+            continue   # the trigger was up: this was not a player gun kill, however well the nose was lined up
+        aim = player_aim(player, victim, event)
+        if not aim:
             continue
-        heading = [now[i] - before[i] for i in range(3)]
-        to = [vpos[i] - now[i] for i in range(3)]
-        n1, n2 = math.hypot(*heading), math.hypot(*to)
-        if n1 < 1e-6 or n2 < 1e-6 or n2 > PLAYER_GUN_METERS:
-            continue
-        cos = max(-1.0, min(1.0, sum(a * b for a, b in zip(heading, to)) / (n1 * n2)))
-        angle = math.degrees(math.acos(cos))
-        if angle <= PLAYER_GUN_DEGREES:
+        angle, dist = aim
+        weak_deg, decent_deg = (FIRE_AIM_DEGREES, FIRE_AIM_DECENT_DEGREES) if fire is not None else (PLAYER_GUN_DEGREES, PLAYER_GUN_STRONG_DEGREES)
+        if not prior:
+            ok, tag = angle <= weak_deg, None
+        elif prior['weapon'] == 'collateral' or prior['confidence'] == 'inferred-low':
+            ok, tag = angle <= weak_deg, 'weak'
+        elif (prior.get('missDistance') or 0) >= 50:
+            ok, tag = angle <= decent_deg, 'decent'
+        else:
+            ok, tag = False, 'strong'
+        if ok:
             event['attacker'] = {
                 'unitId': player['id'], 'weapon': 'gun', 'projectileId': None, 'missDistance': None,
-                'launchDistance': None, 'confidence': 'inferred-aim', 'distance': round(n2),
-                'angleOffHeading': round(angle, 1),
+                'launchDistance': None, 'confidence': 'inferred-aim', 'distance': round(dist),
+                'angleOffNose': round(angle, 1),
             }
+            if fire is not None:
+                event['attacker']['triggerDown'] = True
             if prior:
-                event['attacker']['replacedWeakMatch'] = {'unitId': prior['unitId'], 'weapon': prior['weapon'], 'missDistance': prior.get('missDistance')}
+                event['attacker']['replacedMatch'] = {'unitId': prior['unitId'], 'weapon': prior['weapon'], 'confidence': prior['confidence'], 'missDistance': prior.get('missDistance')}
+        elif tag == 'strong' and angle <= decent_deg:
+            prior['alsoAimedByPlayer'] = {'angleOffNose': round(angle, 1), 'distance': round(dist)}
 
+def apply_overrides(doc, path):
+    """Hand corrections from <replay>.overrides.json (the player can see the in-game replay; the data cannot settle everything).
+    A list of {"victim": unitId, "attacker": unitId, "weapon": "gun", "note": "..."}; "t" (seconds, optional) narrows a victim
+    that has several destruction events. Applied last, marked confidence "user-confirmed", and never guessed at."""
+    if not path.exists():
+        return 0
+    rules = json.loads(path.read_text(encoding='utf-8-sig'))
+    ids = {u['id'] for u in doc['units']}
+    applied = 0
+    for rule in rules:
+        if rule.get('attacker') not in ids:
+            print(f'  override skipped (unknown attacker): {rule}')
+            continue
+        hit = [e for e in doc['events'] if e.get('type') == 'destroyed' and e['unitId'] == rule.get('victim')
+               and ('t' not in rule or abs(e['t'] - rule['t']) <= 1.0)]
+        for e in hit:
+            before = e.get('attacker')
+            e['attacker'] = {'unitId': rule['attacker'], 'weapon': rule.get('weapon', 'gun'), 'projectileId': None, 'missDistance': None,
+                             'launchDistance': None, 'confidence': 'user-confirmed'}
+            if rule.get('note'):
+                e['attacker']['note'] = rule['note']
+            if before:
+                e['attacker']['replacedMatch'] = {k: before.get(k) for k in ('unitId', 'weapon', 'confidence', 'missDistance')}
+            applied += 1
+        if not hit:
+            print(f'  override matched no destruction event: {rule}')
+    return applied
 
 def main():
     if len(sys.argv) != 3:
         raise SystemExit(__doc__)
     sav, js = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
     doc = json.loads(js.read_text(encoding='utf-8'))
-    found = attribute(doc, projectiles(ac8.Replay(sav)))
+    replay = ac8.Replay(sav)
+    players = [u for u in doc['units'] if u.get('isPlayer')]
+    fire = player_fire_intervals(replay, players[0]['id'], doc['duration']) if players else None
+    found = attribute(doc, projectiles(replay), fire)
+    if fire is not None:
+        doc['playerFire'] = {'unitId': players[0]['id'], 'intervals': fire, 'source': 'record type 68 on the player object: trigger press/release (inferred meaning)'}
+    else:
+        doc.pop('playerFire', None)
+    confirmed = apply_overrides(doc, js.with_name(js.stem + '.overrides.json'))
     total = sum(1 for e in doc['events'] if e.get('type') == 'destroyed')
     note = 'events[].attacker is inferred from projectile geometry, not a native kill-credit field'
     if note not in doc.setdefault('warnings', []):
         doc['warnings'].append(note)
     js.write_text(json.dumps(doc, ensure_ascii=False, separators=(',', ':')), encoding='utf-8', newline='')
-    print(f'Attributed {found} of {total} destruction events')
+    print(('Trigger data: %d bursts. ' % len(fire) if fire is not None else 'No usable trigger data. ') + f'Attributed {found} of {total} destruction events' + (f' ({confirmed} hand-confirmed)' if confirmed else ''))
 
 
 if __name__ == '__main__':
