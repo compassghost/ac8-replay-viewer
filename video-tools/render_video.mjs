@@ -2,7 +2,7 @@
 // Steps replay time frame by frame (speed/fps seconds of replay per video frame), screenshots the viewer's own canvas
 // in headless Edge/Chrome, and pipes the frames to ffmpeg. No real-time dependence, no visible browser window.
 //
-//   node render_video.mjs ..\Replay3.json [--speed 20] [--fps 30] [--size 800x800] [--view 3d|top] [--crop 0.8] [--camera whole|dynamic|player|selected|target --unit id [--target lockedId]] [--plates player,wingmen,...] [--missiles] [--components] [--component-kills] [--frame x0,y0,x1,y1] [--yaw deg --elevation deg] [--zoom z]
+//   node render_video.mjs ..\Replay3.json [--speed 20] [--fps 30] [--size 800x800] [--view 3d|top] [--crop 0.8] [--camera whole|dynamic|player|selected|target --unit id [--target lockedId]] [--plates player,wingmen,...] [--missiles] [--components] [--component-kills] [--orbit 30] [--frame x0,y0,x1,y1] [--yaw deg --elevation deg] [--zoom z]
 //                         [--from 0] [--to 2067.9] [--out out.mp4] [--crf 24] [--browser path\to\msedge.exe]
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,7 +33,12 @@ if (!(crop > 0.1 && crop <= 1)) { console.error('--crop must be between 0.1 and 
 // It overrides --crop/--camera; the output size follows the rectangle's aspect ratio (longest side 800).
 const frameArg = opt('frame', null)?.split(',').map(Number) ?? null;
 if (frameArg && (frameArg.length !== 4 || frameArg.some(v => !Number.isFinite(v)) || frameArg[2] <= frameArg[0] || frameArg[3] <= frameArg[1])) { console.error('--frame needs x0,y0,x1,y1 with x1>x0 and y1>y0'); process.exit(2); }
-const frame = frameArg && { x0: frameArg[0], y0: frameArg[1], x1: frameArg[2], y1: frameArg[3] };
+// --orbit S: the 3D camera circles the target, one full turn per S seconds of FOOTAGE (30 = one turn per 30 s of video). Ignores --frame.
+const orbit = opt('orbit', null) == null ? 0 : Number(opt('orbit'));
+if (opt('orbit', null) != null && !(orbit >= 2 && orbit <= 600)) { console.error('--orbit needs seconds per turn between 2 and 600'); process.exit(2); }
+if (orbit && view === 'top') { console.error('--orbit needs --view 3d'); process.exit(2); }
+if (orbit && frameArg) console.warn('--orbit ignores --frame (the view turns).');
+const frame = !orbit && frameArg && { x0: frameArg[0], y0: frameArg[1], x1: frameArg[2], y1: frameArg[3] };
 const rad = name => opt(name, null) == null ? null : Number(opt(name)) * Math.PI / 180;
 const yaw = rad('yaw'), elevation = rad('elevation');
 // --zoom z: viewer zoom factor (1 = default framing, >1 closer); overrides --crop. Ignored with --frame.
@@ -69,7 +74,7 @@ try {
   await page.setViewport({ width: W + 280, height: H + 181, deviceScaleFactor: 1 });
   await page.goto(pathToFileURL(pagePath).href, { waitUntil: 'load', timeout: 300000 });
   await page.waitForFunction('window.replayApi', { timeout: 300000 });
-  const size = await page.evaluate(`replayApi.setup(${JSON.stringify({ view, speed, crop, follow: camera, unit: unitId, lockTarget, plates, missiles: args.includes('--missiles'), components: args.includes('--components'), componentKills: args.includes('--component-kills'), frame, yaw, elevation, zoom })})`);
+  const size = await page.evaluate(`replayApi.setup(${JSON.stringify({ view, speed, crop, follow: camera, unit: unitId, lockTarget, plates, missiles: args.includes('--missiles'), components: args.includes('--components'), componentKills: args.includes('--component-kills'), orbit, frame, yaw, elevation, zoom })})`);
   if (size.w !== W || size.h !== H) console.warn(`Canvas is ${size.w}x${size.h}, expected ${W}x${H}; output uses the canvas size.`);
   const duration = await page.evaluate('replayApi.duration()');
   const from = Number(opt('from', 0)), to = Math.min(Number(opt('to', duration)), duration);
@@ -83,7 +88,7 @@ try {
 
   const started = Date.now();
   for (let i = 0; i < frames; i++) {
-    const url = await page.evaluate(`replayApi.frame(${from + i * step}, 'png')`);
+    const url = await page.evaluate(`replayApi.frame(${from + i * step}, 'png', )`);
     const buf = Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
     if (!ffmpeg.stdin.write(buf)) await new Promise(r => ffmpeg.stdin.once('drain', r));
     if (i % 100 === 0 || i === frames - 1) {
