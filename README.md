@@ -50,6 +50,20 @@ are pentagonal prisms. Red lines run from an attacker to its target for 10 s aft
 - A hosted copy of this page (for example GitHub Pages) is only a preview of the sample missions. For your own replays, run the
   package on your computer.
 
+## Why kill credit is only inferred
+
+The replay does not track kills. It stores positions, health, a destroyed flag, projectiles (missiles and AI gun rounds) and the player's trigger. Credit is a reconstruction, so treat every kill as a best guess:
+
+- A destruction has no recorded cause: a hit, a collision, a crash or debris all look the same.
+- The shooter is the unit nearest a projectile's first sample, so aircraft in tight formation can be confused.
+- A projectile near the victim at death may only have passed by; gun rounds do not home or explode near a target.
+- The player's own gun rounds are not recorded. Player gun kills are guessed from the trigger (where the save has it) and the nose direction.
+- Several shooters can damage one target; the credited one need not have dealt the killing damage.
+- Trigger data exists only in some missions (1, 2 and 4 were checked); elsewhere only aim is used.
+- Components, collateral kills and collisions are credited by proximity and timing.
+- Some recordings end before the mission does, so later kills are missing.
+- Kills where the player's trigger was also down are marked "player also firing".
+
 ## What to keep in mind
 
 - Kill credit is **inferred** from projectile geometry. The save has no kill-credit field. Many kills have no identifiable

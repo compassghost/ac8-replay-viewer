@@ -24,7 +24,7 @@ foreach ($f in $files) { Copy-Item (Join-Path $root $f) $stage }
 foreach ($f in 'render_video.mjs','package.json','package-lock.json') { Copy-Item (Join-Path $root "video-tools\$f") "$stage\video-tools" }
 
 # Sample replay: regenerate attribution/projectiles from the save, then round, all on the staging copy.
-foreach ($s in $Sample) { Copy-Item (Join-Path $root "$s.json") $stage; $ov = Join-Path $root "$s.overrides.json"; if (Test-Path $ov) { Copy-Item $ov $stage } }
+foreach ($s in $Sample) { Copy-Item (Join-Path $root "$s.json") $stage }
 Push-Location $stage
 try {
   foreach ($s in $Sample) {

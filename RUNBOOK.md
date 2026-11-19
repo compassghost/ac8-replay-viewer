@@ -51,16 +51,6 @@ Steps 2 and 3 re-derive their data each time, so they are safe to re-run. Step 4
 
 To validate a batch of saves: `python validate_replays.py <save folder>`.
 
-### Correcting kill credit
-
-Kill credit is inferred, so you can overrule it. Put a file named after the replay next to it, e.g. `Replay13.overrides.json`:
-
-```json
-[ { "victim": 901, "attacker": 26, "weapon": "gun", "note": "confirmed from the in-game replay" } ]
-```
-
-`attribute_kills.py` applies it last and marks those kills "confirmed" in the viewer. `victim` and `attacker` are unit IDs (the Unit Tracker and the JSON show them); add `"t": seconds` if a victim has several destruction events. Re-run steps 2-4 after editing it.
-
 ### Adding names
 
 Callsigns come from the save's recorded labels. To name an aircraft the save does not label, add a `displayName` to the unit in

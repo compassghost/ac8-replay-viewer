@@ -165,3 +165,11 @@ Derived, not a native field. `detectSections` in `playback.mjs` finds times wher
 ## Player trigger (record type 68)
 
 The player object carries type 68 records with a 4-byte payload: a first byte of 1 is a press and a first byte of 0 is a release (the other three bytes are a marker that differs per recording; a bare `00000000` also appears at release). In Missions 1, 2 and 4 the press and release counts match and the bursts line up with the player's gun kills, so `attribute_kills.py` reads them as the trigger and stores `playerFire.intervals` in the JSON. Missions 23 and 28 do not follow the pattern (one repeated value), so no trigger data is used there. This is an observation, not a documented field. Type 149 on the player is the flight-control stream (axes 25-31); it has no trigger channel.
+
+## Projectile channel 6 (2026-11-19): not an owner/target link
+
+Probed on Mission ID 29 (Replay3, 309 attributed missile kills) and Mission ID 30 (Replay11). Channel 6 exists only on projectiles that live long enough to be missiles (about 1,990 of 17,073 in Replay3), as 2 to 4 records of type 252, each 24 bytes: header, next (+4), prev (+8), float32 time (+12) and one uint32 at +16 (+20 is always 0).
+
+- The uint32 splits as kind (low byte: 0, 1 or 2), category (second byte, about 30 distinct values) and a 16-bit upper value. Whole-word and shifted comparisons against `NamedHashToIDMap` keys and object header +8 found no matches; the map's values are 0..N-1 indexes, not object IDs.
+- Chains: (kind 2,1,1) = 784 projectiles, 4 attributed to a kill; (kind 0,1,1) = 266, 223 attributed (84%); (1,1) = 840, 75 attributed. The last record is 20 s after the first, the missile lifetime. First-record kind 0 therefore marks a missile that hit a tracked vehicle, kind 2 one that did not (possibly guidance or lock state). This is a correlation.
+- No tag identifies the victim (0 of 33 repeated kind-0 values map to one victim; no repeated tag maps to a single victim) and only about half of repeated final tags map to one shooter, so the value is not a shooter or victim hash. The 16-bit upper value repeats across unrelated shooters and victims. Meaning unresolved.

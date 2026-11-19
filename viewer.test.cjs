@@ -238,5 +238,18 @@ vm.runInContext("load(m29)",context);
  c.checked=false;c.onchange({target:c});
  assert.equal(vm.runInContext("killsOf(1).length",context),1,'Turning the option off removes the component kill again');
  assert.ok(!/--component-kills/.test(cap()),'No --component-kills flag when off');
+ vm.runInContext("load(m29);",context);}{ // Unit Info shows the locked unit too, with distance and relative speed, when a different unit is selected
+ vm.runInContext(`
+ const lu=(id,x,y,vx,vy,player)=>({id,iconType:'Air',iconTypeCode:1,recordedLabel:player?'F-16C':'F-15C',isPlayer:player,isWingman:false,startTime:0,tracks:{position:[[0,x,y,1000,0],[10,x+vx*10,y+vy*10,1000,0]],quaternion:[[0,0,0,0,1,0]],state:[[0,id===1?131:67]]}});
+ load({schema:'ac8-tactical-replay',schemaVersion:1,source:{file:'lock-test'},mission:{MissionID:99},duration:10,events:[],units:[lu(1,0,0,100,0,true),lu(2,3000,4000,-100,0,false)]});
+ selected=1;time=2;draw();`,context);
+ elem('lockTarget').onclick();
+ vm.runInContext("selected=2;time=2;draw();",context);
+ const txt=elem('selection').textContent;
+ assert.match(txt,/SELECTED/,'Panel labels the selected unit');assert.match(txt,/LOCKED/,'Panel labels the locked unit');
+ assert.match(txt,/Distance 4\.\d\d km|Distance [345],\d{3} m/,'Distance between selected and locked');
+ assert.match(txt,/Relative speed 720 km\/h/,'Relative speed is the velocity difference (200 m/s = 720 km/h)');
+ assert.equal(elem('clearLock').style.display,'','Clear lock button is offered');
+ elem('clearLock').onclick();assert.ok(!/LOCKED/.test(elem('selection').textContent),'Clearing the lock returns to a single unit');
  vm.runInContext("load(m29);",context);}const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
 fs.writeFileSync(path.join(__dirname,'viewer-validation.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));

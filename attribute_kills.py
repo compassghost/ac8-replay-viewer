@@ -287,8 +287,8 @@ def mark_player_guns(doc, units, by_id, fire=None):
     inferred to be a player gun kill. Evidence needed depends on what the projectile match offers:
       - no match, or a weak one (low confidence / collateral): nose within PLAYER_GUN_DEGREES
       - a decent match that missed by >= 50 m: nose within PLAYER_GUN_STRONG_DEGREES
-      - a close match (< 50 m, high confidence): keep it, but note that the player was also lined up (alsoAimedByPlayer).
-    Validated on Mission 2 (guns-only play): every kill the user confirmed has the nose within 2.2 degrees at <= 1.5 km."""
+      - a close match (< 50 m, high confidence): keep it, and with trigger data note that the player was also firing (playerFiring).
+    Validated on Mission 2 (guns-only play): every kill the player reported as a gun kill had the nose within 2.2 degrees at <= 1.5 km."""
     players = [u for u in units if u.get('isPlayer')]
     if not players:
         return
@@ -327,36 +327,9 @@ def mark_player_guns(doc, units, by_id, fire=None):
                 event['attacker']['triggerDown'] = True
             if prior:
                 event['attacker']['replacedMatch'] = {'unitId': prior['unitId'], 'weapon': prior['weapon'], 'confidence': prior['confidence'], 'missDistance': prior.get('missDistance')}
-        elif tag == 'strong' and angle <= decent_deg:
-            prior['alsoAimedByPlayer'] = {'angleOffNose': round(angle, 1), 'distance': round(dist)}
-
-def apply_overrides(doc, path):
-    """Hand corrections from <replay>.overrides.json (the player can see the in-game replay; the data cannot settle everything).
-    A list of {"victim": unitId, "attacker": unitId, "weapon": "gun", "note": "..."}; "t" (seconds, optional) narrows a victim
-    that has several destruction events. Applied last, marked confidence "user-confirmed", and never guessed at."""
-    if not path.exists():
-        return 0
-    rules = json.loads(path.read_text(encoding='utf-8-sig'))
-    ids = {u['id'] for u in doc['units']}
-    applied = 0
-    for rule in rules:
-        if rule.get('attacker') not in ids:
-            print(f'  override skipped (unknown attacker): {rule}')
-            continue
-        hit = [e for e in doc['events'] if e.get('type') == 'destroyed' and e['unitId'] == rule.get('victim')
-               and ('t' not in rule or abs(e['t'] - rule['t']) <= 1.0)]
-        for e in hit:
-            before = e.get('attacker')
-            e['attacker'] = {'unitId': rule['attacker'], 'weapon': rule.get('weapon', 'gun'), 'projectileId': None, 'missDistance': None,
-                             'launchDistance': None, 'confidence': 'user-confirmed'}
-            if rule.get('note'):
-                e['attacker']['note'] = rule['note']
-            if before:
-                e['attacker']['replacedMatch'] = {k: before.get(k) for k in ('unitId', 'weapon', 'confidence', 'missDistance')}
-            applied += 1
-        if not hit:
-            print(f'  override matched no destruction event: {rule}')
-    return applied
+        elif prior is not None and fire is not None:
+            # Someone else is credited, but the player's trigger was down and the victim was within gun range: say so.
+            prior['playerFiring'] = {'angleOffNose': round(angle, 1), 'distance': round(dist)}
 
 def main():
     if len(sys.argv) != 3:
@@ -371,13 +344,12 @@ def main():
         doc['playerFire'] = {'unitId': players[0]['id'], 'intervals': fire, 'source': 'record type 68 on the player object: trigger press/release (inferred meaning)'}
     else:
         doc.pop('playerFire', None)
-    confirmed = apply_overrides(doc, js.with_name(js.stem + '.overrides.json'))
     total = sum(1 for e in doc['events'] if e.get('type') == 'destroyed')
     note = 'events[].attacker is inferred from projectile geometry, not a native kill-credit field'
     if note not in doc.setdefault('warnings', []):
         doc['warnings'].append(note)
     js.write_text(json.dumps(doc, ensure_ascii=False, separators=(',', ':')), encoding='utf-8', newline='')
-    print(('Trigger data: %d bursts. ' % len(fire) if fire is not None else 'No usable trigger data. ') + f'Attributed {found} of {total} destruction events' + (f' ({confirmed} hand-confirmed)' if confirmed else ''))
+    print(('Trigger data: %d bursts. ' % len(fire) if fire is not None else 'No usable trigger data. ') + f'Attributed {found} of {total} destruction events')
 
 
 if __name__ == '__main__':
