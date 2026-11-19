@@ -94,22 +94,32 @@ def projectile_position(rows, t):
     return [a[k] + (b[k] - a[k]) * f for k in (1, 2, 3)]
 
 
+def victim_position(victim, t, event):
+    """Where the victim was at time t: its track for a tracked vehicle, else the recorded death location (components)."""
+    if '_times' in victim:
+        return unit_position(victim, t)
+    return event.get('position')
+
+
 def attribute(doc, projs):
     units = [u for u in doc['units'] if u['tracks']['position'] and u['iconType'] in VEHICLE_TYPES]
     by_id = {u['id']: u for u in units}
     for u in units:
         u['_times'] = [r[0] for r in u['tracks']['position']]
+    # Victims can be ANY unit: components (a ship's guns, AA guns, parts) have no usable world track, so their death location
+    # (events[].position) stands in for their position. Only vehicles (those with _times) are tracked through time.
+    victims = {u['id']: u for u in doc['units']}
     for event in doc['events']:
         event.pop('attacker', None)   # re-derive everything; stale attributions from an older rule must not survive
     flights = [(pid, rows, in_flight(rows)) for pid, rows in projs]
     flights = [x for x in flights if len(x[2]) >= 2]
     found = 0
     for event in doc['events']:
-        if event.get('type') != 'destroyed' or event['unitId'] not in by_id:
+        if event.get('type') != 'destroyed' or event['unitId'] not in victims:
             continue
-        victim = by_id[event['unitId']]
+        victim = victims[event['unitId']]
         t = event['t']
-        if not unit_position(victim, t):
+        if not victim_position(victim, t, event):
             continue
         # The killing projectile is the one whose flight ENDS at the moment of destruction. Earlier hits that merely
         # damaged the target, and projectiles that only linger after impact, end too early and are skipped.
@@ -119,7 +129,7 @@ def attribute(doc, projs):
                 continue
             te = min(t, f[-1][0])
             q = projectile_position(f, te) if te < f[-1][0] else f[-1][1:]
-            vp = unit_position(victim, te)
+            vp = victim_position(victim, te, event)
             if not q or not vp:
                 continue
             d = math.dist(q, vp)
@@ -155,8 +165,8 @@ def attribute(doc, projs):
             'confidence': 'inferred-high' if (miss < 50 and abs(gap) <= MAX_IMPACT_GAP) or (miss < 100 and abs(gap) <= 0.5) else 'inferred-low',
         }
         found += 1
-    mark_collateral(doc, by_id)
-    mark_player_guns(doc, units, by_id)
+    mark_collateral(doc, victims)
+    mark_player_guns(doc, units, victims)
     for u in units:
         u.pop('_times', None)
     return found
@@ -165,7 +175,7 @@ def attribute(doc, projs):
 def mark_collateral(doc, by_id):
     """A weak projectile match shortly after, and near, another attributed kill is probably debris/collision
     with that earlier kill. Re-label it 'collateral' and credit the earlier kill's shooter (still an inference)."""
-    kills = [e for e in doc['events'] if e.get('type') == 'destroyed' and e['unitId'] in by_id]
+    kills = [e for e in doc['events'] if e.get('type') == 'destroyed' and e['unitId'] in by_id and e.get('position')]
     for event in kills:
         att = event.get('attacker')
         if not att or att['confidence'] != 'inferred-low':
@@ -196,14 +206,19 @@ def mark_player_guns(doc, units, by_id):
         return
     player = players[0]
     for event in doc['events']:
-        if event.get('type') != 'destroyed' or 'attacker' in event or event['unitId'] not in by_id:
+        if event.get('type') != 'destroyed' or event['unitId'] not in by_id:
+            continue
+        prior = event.get('attacker')
+        # A weak projectile match (inferred-low, not collateral) does not beat a clear player gun shot: the player's rounds are
+        # invisible, so a 100-200 m "miss" by an AI missile is as likely to be a gun kill the player lined up.
+        if prior and not (prior['confidence'] == 'inferred-low' and prior['weapon'] != 'collateral' and prior['unitId'] != player['id']):
             continue
         victim = by_id[event['unitId']]
         if victim is player:
             continue
         t = event['t']
         now, before = unit_position(player, t), unit_position(player, t - 0.5)
-        vpos = unit_position(victim, t - 0.2) or event['position']
+        vpos = victim_position(victim, t - 0.2, event) or event.get('position')
         if not now or not before or not vpos:
             continue
         heading = [now[i] - before[i] for i in range(3)]
@@ -219,6 +234,8 @@ def mark_player_guns(doc, units, by_id):
                 'launchDistance': None, 'confidence': 'inferred-aim', 'distance': round(n2),
                 'angleOffHeading': round(angle, 1),
             }
+            if prior:
+                event['attacker']['replacedWeakMatch'] = {'unitId': prior['unitId'], 'weapon': prior['weapon'], 'missDistance': prior.get('missDistance')}
 
 
 def main():

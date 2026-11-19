@@ -88,6 +88,7 @@ Main options:
 | `--frame x0,y0,x1,y1` | A framing rectangle in view-plane metres (from the Capture panel). |
 | `--missiles` | Show projectiles. |
 | `--components` | Show components (a ship's guns, missile cells, turrets) as small markers. |
+| `--component-kills` | Also credit kills of components and structures (AA guns, SAMs, ship guns, turrets, parts). |
 | `--plates a,b,...` | Label groups: `player,wingmen,namedAllies,alliedUnits,namedEnemies,enemyUnits` (or `none`). |
 | `--size WxH` | Output size, at most 800x800. Default is 800x450 (16:9); a drawn frame keeps its own ratio. |
 | `--crf N` | Quality: lower is sharper and larger (default 18). |
@@ -124,9 +125,10 @@ also works from `file://` (the page grows by the size of the replay).
 
 - Kill credit rule: a kill is credited to the projectile whose flight ends at the moment of destruction. Earlier hits that only
   damaged the target, and projectile objects that merely linger after impact, do not win. The player's own gun rounds are not
-  recorded, so player gun kills are inferred from aim and are marked as such.
+  recorded, so player gun kills are inferred from aim and are marked as such. A kill the player lined up (within 1.5 km and 10 degrees of
+  heading) also overrides a weak projectile match (a "low" confidence AI shot that missed by 100-200 m).
 - Weapon label: a projectile that accelerates (by 15% or more over its flight) is a missile; a constant-speed one is a gun.
 - Slow, sparsely sampled shells (artillery) are kept for their whole flight; a projectile is only cut where it actually stops.
 - Units mounted on another unit (a ship's guns and missile cells, a tank's turret) are treated as parts of the parent: they get
-  no label, kill marker or kill credit.
+  no label, kill marker or kill credit, unless **Track component kills** is on in Display Settings (it also credits AA guns, SAMs and other structures).
 - See `FORMAT.md` for the binary and JSON layout.

@@ -1,4 +1,4 @@
-﻿# ACE COMBAT 8 tactical replay viewer
+# ACE COMBAT 8 tactical replay viewer
 
 A browser viewer for the post-mission tactical replay in ACE COMBAT 8 (the radar-style view with moving aircraft markers).
 It reads the replay save files the game already writes, converts them to JSON, and plays them back with a 3D wireframe view,
@@ -29,12 +29,12 @@ Mission numbers follow the game's mission numbering: **Mission number = Mission 
 - **Camera dropdown:** Whole mission, Follow pilot, Dynamic (combat) (fits the combat-relevant area), Dynamic (target)
   (frames the selected aircraft and a locked target), Follow selected.
 - **Top left:** *Unit Info* (details for the selected unit, with Lock), *Unit Tracker* (search units, see their kills and who
-  destroyed them; clicking a kill jumps to 1 s before it and centres on the target), *Display Settings* (show projectiles, show components such as a ship's guns and missile cells, and which units get name labels).
+  destroyed them; clicking a kill jumps to 1 s before it and centres on the target), *Display Settings* (show projectiles, show components such as a ship's guns and missile cells, track component kills such as AA guns and turrets, and which units get name labels).
 - **Capture:** draw a framing rectangle, set start/end markers and copy a command for the offline video renderer
   (see `RUNBOOK.md`).
 - **Replay selector** (top right): switches between the replays listed in `replays.json`.
 
-Colours (matching the in-game replay): green = player/allies, orange-red = enemies, yellow = unidentified, grey = scenery that is not a real target.
+Colours (matching the in-game replay): green = player and wingmen, light blue = other allies, orange-red = enemies, yellow = unidentified, grey = scenery that is not a real target.
 Aircraft are wireframe dorito shapes oriented by the recorded attitude; ground vehicles are cubes; ships with a recorded heading
 are pentagonal prisms. Red lines run from an attacker to its target for 10 s after a kill.
 

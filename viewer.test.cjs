@@ -223,5 +223,20 @@ vm.runInContext("load(m29)",context);
  assert.equal(elem('spawnTick').style.display,'block','Spawn tick shown on the timeline');
  vm.runInContext("time=info_t+5;",Object.assign(context,{info_t:info.t}));vm.runInContext("selected=units[0].id;",context);
  elem('unitSearch').value='';vm.runInContext("time=0;load(m29);",context);}
-const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
+{ // Track component kills: AA guns / SAMs / parts are credited only when the option is on; vehicles always are
+ vm.runInContext(`
+ const mk=(id,type,code,label,x,extra={})=>Object.assign({id,iconType:type,iconTypeCode:code,recordedLabel:label,isPlayer:id===1,isWingman:false,startTime:0,tracks:{position:[[0,x,200,1000,0],[10,x+50,250,1000,0]],quaternion:[[0,0,0,0,1,0]],state:[[0,id===1?131:67]]}},extra);
+ load({schema:'ac8-tactical-replay',schemaVersion:1,source:{file:'compkill-test'},mission:{MissionID:99},duration:10,
+  events:[{t:5,type:'destroyed',unitId:2,position:[1,2,3],attacker:{unitId:1,weapon:'missile',confidence:'inferred-high'}},{t:6,type:'destroyed',unitId:3,position:[4,5,6],attacker:{unitId:1,weapon:'gun',confidence:'inferred-high'}}],
+  units:[mk(1,'Air',1,'F-16C',0),mk(2,'Ground',5,'TANK',500),mk(3,'Building',6,'AA GUN',900)]});`,context);
+ assert.equal(vm.runInContext("killsOf(1).length",context),1,'Only the vehicle kill is credited by default');
+ assert.equal(vm.runInContext("replay.events.find(e=>e.unitId===3).attacker",context),null,'AA gun destruction stays unattributed by default');
+ const c=elem('dp-compkills');c.checked=true;c.onchange({target:c});
+ assert.equal(vm.runInContext("killsOf(1).length",context),2,'Component kill is credited when the option is on');
+ const cap=()=>String(vm.runInContext('capCommand()',context));
+ assert.match(cap(),/--component-kills/,'Capture command carries --component-kills');
+ c.checked=false;c.onchange({target:c});
+ assert.equal(vm.runInContext("killsOf(1).length",context),1,'Turning the option off removes the component kill again');
+ assert.ok(!/--component-kills/.test(cap()),'No --component-kills flag when off');
+ vm.runInContext("load(m29);",context);}const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
 fs.writeFileSync(path.join(__dirname,'viewer-validation.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
