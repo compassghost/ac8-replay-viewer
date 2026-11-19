@@ -38,26 +38,14 @@
   <a class="cta" href="index.html">Open the viewer (sample missions)</a>
   <a class="cta alt" href="#how">How to use your own replays</a>
 
-  <div class="card safe"><b>Your replays stay on your computer.</b> Saves are converted locally by scripts you can read (Python standard library only), and the viewer runs in your browser without uploading anything. A content security policy in the page blocks requests to any other site. Don't send your <code>.sav</code> files to anyone else's converter. This hosted page is a preview of the sample missions; run the package locally for your own replays.</div>
+  <div class="card safe"><b>Your replays stay on your computer.</b> Saves are converted locally by scripts you can read (Python standard library only), and the viewer runs in your browser without uploading anything. A content security policy in the page blocks requests to any other site. Don't send your <code>.sav</code> files to anyone else's converter. This hosted page is a preview of the sample missions; run the package locally for your own replays. </div>
 
-  <div class="frame">
-    <div class="bar">Live demo: Mission 2 (7:02), with Mission 4 in the replay selector. Press Play, click a marker, or open <b>Unit Tracker</b> to follow kills.</div>
-    <iframe src="index.html" title="Replay viewer demo" loading="lazy"></iframe>
-  </div>
-
-  <h2>What you get</h2>
-  <div class="grid">
-    <div class="card"><b>3D and top-down</b><br>Orbit, zoom, follow the pilot, or let the camera frame the fight.</div>
-    <div class="card"><b>Kill tracking</b><br>Who destroyed what, with a jump-to-kill list for every unit.</div>
-    <div class="card"><b>Projectiles and components</b><br>Missiles and gun rounds, plus ship guns and cells, switched on in Display Settings.</div>
-    <div class="card"><b>Video export</b><br>Frame a shot in the Capture panel and render an MP4 offline.</div>
-  </div>
 
   <h2 id="how">Use your own replays</h2>
   <p>The viewer is self-service: you bring the save, your machine does the conversion.</p>
   <ol class="steps">
     <li><b>Download this package</b> and unzip it. You need Python 3.10+ (no extra packages).</li>
-    <li><b>Convert a save.</b> Replays live in <code>%LOCALAPPDATA%\BANDAI NAMCO Entertainment\ACE COMBAT 8\Saved\SaveGames</code>. The original is never modified.
+    <li><b>Convert a save.</b> Replays live in <code>%LOCALAPPDATA%\BANDAI NAMCO Entertainment\ACE COMBAT 8\Saved\SaveGames</code>. The original is never modified. Make a copy of any replays so you don't lose them. The game automatically deletes old saves automatically!
 <pre>python ac8_replay.py "...\Replay5.sav" --export Replay5.json
 python attribute_kills.py "...\Replay5.sav" Replay5.json
 python add_missiles.py "...\Replay5.sav" Replay5.json
