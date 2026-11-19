@@ -108,7 +108,7 @@ vm.runInContext("load(m29)",context);
 {const fills=[],origFill=ctx.fillRect;ctx.fillRect=function(){fills.push(String(ctx.fillStyle));};
  context.m29=JSON.parse(sample);vm.runInContext("load(m29);",context);
  const mid=vm.runInContext("(()=>{const m=replay.missiles.find(m=>m.t1-m.t0>10);return (m.t0+m.t1)/2;})()",context);
- vm.runInContext(`time=${mid};draw();`,context);assert.ok(!fills.includes('#ffd27a'),'Missiles hidden by default');
+ vm.runInContext(`time=${mid};draw();`,context);assert.ok(fills.includes('#ffd27a'),'Projectiles are on by default');
  setProj(true);fills.length=0;vm.runInContext(`time=${mid};draw();`,context);
  assert.ok(fills.includes('#ffd27a'),'Missile head drawn when the Projectiles button is on');
  setProj(false);fills.length=0;vm.runInContext("draw();",context);assert.ok(!fills.includes('#ffd27a'),'Projectiles button turns them off again');
@@ -175,7 +175,7 @@ vm.runInContext("load(m29)",context);
  assert.ok(!/selPanelOpen|unitPanelOpen|namePanelOpen/.test(tools),'Panel buttons are no longer in the camera toolbar');
  assert.ok(!/showMissiles|Projectiles/.test(tools),'Projectiles is no longer in the camera toolbar');
  const dp=tpl.match(/id="namePanel"[\s\S]*?<div class="unit-panel sel-panel"/)[0];
- assert.match(dp,/id="dp-projectiles">Show projectiles/,'Projectiles is a checkbox in Display Settings');
+ assert.match(dp,/id="dp-projectiles" checked>Show projectiles/,'Projectiles is a checkbox in Display Settings, checked by default');
  setProj(true);assert.equal(elem('dp-projectiles').checked,true);setProj(false);assert.equal(elem('dp-projectiles').checked,false);}
 { // Clicking a kill in the Unit Tracker jumps 1 s before it AND centers the camera on the target
  vm.runInContext("load(m29);follow=undefined;selected=21;time=2000;lastPanelKey='';draw();",context);elem('follow').value='off';
@@ -269,6 +269,9 @@ vm.runInContext("load(m29)",context);
   units:[{id:1,iconType:'Air',iconTypeCode:1,recordedLabel:'F-16C',isPlayer:true,isWingman:false,startTime:0,tracks:{position:[[0,0,0,1000,0],[10,1000,0,1000,0]],quaternion:[[0,0,0,0,1,0]],state:[[0,131]]}}]});`,context);
  assert.equal(vm.runInContext("firingAt(1)",context),false,'Trigger up before the burst');assert.equal(vm.runInContext("firingAt(3)",context),true,'Trigger down inside the burst');assert.equal(vm.runInContext("firingAt(5)",context),false,'Trigger up after the burst');
  const nose=JSON.parse(vm.runInContext("JSON.stringify(noseDirection(units[0],3))",context));assert.ok(Math.abs(nose[0]-1)<1e-9&&Math.abs(nose[1])<1e-9,'Identity orientation points the nose along +X');
- for(const t of [1,3,5]){vm.runInContext("time="+t+";draw();",context);}
+ const strokes=[],origStroke=ctx.stroke;ctx.stroke=function(){strokes.push(String(ctx.strokeStyle));};
+ setProj(true);vm.runInContext('time=3;draw();',context);assert.ok(strokes.includes('#ffd84a'),'Firing line drawn while firing with projectiles on');
+ strokes.length=0;ctx.strokeStyle='#000';setProj(false);vm.runInContext('time=3;draw();',context);assert.ok(!strokes.includes('#ffd84a'),'Firing line is part of the projectile display: hidden when projectiles are off');
+ vm.runInContext('time=5;',context);setProj(true);strokes.length=0;ctx.strokeStyle='#000';vm.runInContext('draw();',context);assert.ok(!strokes.includes('#ffd84a'),'No firing line when the trigger is up');ctx.stroke=origStroke;
  vm.runInContext("load(m29);",context);}const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
 fs.writeFileSync(path.join(__dirname,'viewer-validation.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
