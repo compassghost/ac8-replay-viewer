@@ -31,9 +31,9 @@ if(JSON.parse(sample).mission.MissionID===29){
  elem('unitSearch').value='';vm.runInContext('time=0;lastPanelKey=""',context);
 }
 assert.ok(elem('mission').textContent.includes('Mission ID '+JSON.parse(sample).mission.MissionID));assert.match(elem('clock').textContent,/00:00/);
-vm.runInContext("$('play').onclick();frame(1000);frame(1100);",context);assert.equal(elem('play').textContent,'Pause');assert.match(elem('clock').textContent,/00:00\.2/);
+vm.runInContext("$('play').onclick();frame(1000);frame(1100);",context);assert.equal(elem('play').textContent,'\u23F8');assert.match(elem('clock').textContent,/00:00\.2/);
 vm.runInContext("$('play').onclick();$('timeline').oninput({target:{value:'200'}});",context);assert.match(elem('clock').textContent,/03:20/);assert.ok(elem('events').children.length>0);
-vm.runInContext("$('reset').onclick();",context);assert.equal(elem('play').textContent,'Play');assert.match(elem('clock').textContent,/00:00\.0/);
+vm.runInContext("$('reset').onclick();",context);assert.equal(elem('play').textContent,'\u25B6');assert.match(elem('clock').textContent,/00:00\.0/);
 context.nextDoc=JSON.parse(fs.readFileSync(path.join(__dirname,'Replay15.json')));vm.runInContext('load(nextDoc)',context);assert.match(elem('mission').textContent,/Mission ID 3/);
 vm.runInContext(`
 camera.yaw=0;camera.elevation=Math.PI/4;
@@ -53,7 +53,7 @@ load({schema:'ac8-tactical-replay',schemaVersion:1,source:{file:'test'},mission:
 `,context);
 vm.runInContext('selected=77;draw();',context);
 assert.match(elem('selection').textContent,/Altitude [\d,]+ m/);assert.match(elem('selection').textContent,/Position -?[\d.]+, -?[\d.]+ km/);
-vm.runInContext('time=2;',context);elem('fwd5').onclick();assert.equal(vm.runInContext('time',context),7);elem('fwd5').onclick();assert.equal(vm.runInContext('time',context),10);elem('back5').onclick();assert.equal(vm.runInContext('time',context),5);elem('back5').onclick();assert.equal(vm.runInContext('time',context),0);elem('menuToggle').onclick();
+vm.runInContext('time=2;',context);elem('fwd5').onclick();assert.equal(vm.runInContext('time',context),7);elem('fwd5').onclick();assert.equal(vm.runInContext('time',context),10);elem('back5').onclick();assert.equal(vm.runInContext('time',context),5);elem('back5').onclick();assert.equal(vm.runInContext('time',context),0);elem('sideCollapse').onclick();
 vm.runInContext(`
 const followUnit=(id,offset,player)=>({id,iconType:'Air',iconTypeCode:1,isPlayer:player,isWingman:!player,startTime:0,tracks:{position:[[0,100+offset,200,1000,0],[10,1100+offset,1200,2000,0]],quaternion:[[0,0,0,0,1,0]],state:[[0,3]]}});
 load({schema:'ac8-tactical-replay',schemaVersion:1,source:{file:'formation-test'},mission:{MissionID:99},duration:10,events:[],units:[followUnit(1,0,true),followUnit(2,100,false)]});
@@ -317,5 +317,8 @@ vm.runInContext("load(m29)",context);
  assert.ok(Math.abs(yawAt(7.5)-(0.5+Math.PI/2))<1e-9,'A quarter turn after 7.5 s of footage');
  assert.ok(Math.abs(yawAt(30)-(0.5+2*Math.PI))<1e-9,'One full turn after 30 s of footage');
  vm.runInContext("window.replayApi.setup({view:'3d',speed:10,follow:'player',yaw:0.5,elevation:0.6});",context);vm.runInContext("window.replayApi.frame(100,'png',15)",context);assert.ok(Math.abs(vm.runInContext("camera.yaw",context)-0.5)<1e-9,'Without orbit the camera does not turn');
- vm.runInContext("captureMode=false;load(m29);",context);}const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
+ vm.runInContext("captureMode=false;load(m29);",context);}{const fade=(t,play)=>vm.runInContext("replay.sections=[200];captureMode=false;playing="+play+";time="+t+";cutFade()",context);
+ assert.strictEqual(fade(100,true),0,'No fade far from a cut');assert.ok(fade(200,true)>0.99,'Black at the cut while playing');assert.ok(fade(200.5,true)>0&&fade(200.5,true)<1,'Fades back in after the cut');assert.ok(fade(199.5,true)>0,'Fades out before the cut');assert.strictEqual(fade(200,false),0,'No fade when paused on a cut (section jump)');
+ vm.runInContext("playing=false;replay.sections=[];",context);}
+const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
 fs.writeFileSync(path.join(__dirname,'viewer-validation.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
