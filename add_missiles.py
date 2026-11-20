@@ -16,6 +16,7 @@ from attribute_kills import projectiles, projectile_position, unit_position, in_
 
 MIN_SECONDS = 2.0
 SAMPLE_GAP = 0.25
+DROP_GAP = 3.0           # seconds between bombs of one drop
 
 
 CHILD_METERS = 60.0     # a projectile that starts this close to another projectile in flight is its child (a submunition)
@@ -78,14 +79,25 @@ def missiles(doc, projs):
             children.setdefault(best[1], []).append(o['t0'])
 
     fire = {}
+    drops = {}
     for x in launched:
         e = fire.setdefault(str(x['shooter']), {'m': [], 'b': []})
         kids = children.get(x['id'], [])
         if len(kids) >= MIN_CHILDREN:
             e['b'].append([round(x['t0'], 1), len(kids)])
+        elif x['kind'] == 'bomb':   # lone dropped bombs are grouped into drops below
+            drops.setdefault(str(x['shooter']), []).append(x['t0'])
         elif x['kind'] != 'gun':   # gun rounds are deliberately not counted: too many, and the player's are often not recorded
 
             e['m'].append(round(x['t0'], 1))
+    for sid, times in drops.items():   # bombs released within DROP_GAP of each other are one drop (an SFFS circle or line is one drop of N bombs; an XSDB is a drop of 1)
+        e = fire.setdefault(sid, {'m': [], 'b': []})
+        times.sort(); start = prev = times[0]; n = 0
+        for tt in times:
+            if tt - prev > DROP_GAP:
+                e['b'].append([round(start, 1), n]); start, n = tt, 0
+            prev = tt; n += 1
+        e['b'].append([round(start, 1), n])
     for e in fire.values():
         e['m'].sort(); e['b'].sort()
 
@@ -94,7 +106,7 @@ def missiles(doc, projs):
         rows = x['f']
         # keep anything accelerating (a missile, even a short close-range one) and anything that flies for MIN_SECONDS or longer
         # (slow-moving or long-range shells, i.e. artillery)
-        if rows[-1][0] - rows[0][0] < MIN_SECONDS and x['kind'] != 'missile':
+        if rows[-1][0] - rows[0][0] < MIN_SECONDS and x['kind'] not in ('missile', 'bomb'):
             continue
         track, last = [], None
         for i, r in enumerate(rows):

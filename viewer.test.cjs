@@ -192,8 +192,9 @@ vm.runInContext("load(m29)",context);
  vm.runInContext("load(m29);follow=undefined;",context);elem('follow').value='off';const fate=()=>elem('unitFate').children.map(c=>c.textContent).join('');
  const ev=JSON.parse(vm.runInContext("JSON.stringify(replay.events.find(e=>e.type==='destroyed'&&e.attacker&&e.attacker.weapon==='missile'&&unitMap.has(e.unitId)&&unitMap.has(e.attacker.unitId)))",context));
  vm.runInContext(`selected=${ev.unitId};lastPanelKey='';time=0;draw();`,context);
+ assert.ok(!/missile|gun|bomb/.test(fate()),'Weapon type is hidden by default: '+fate());vm.runInContext('showKillSource=true;lastPanelKey="";draw();',context);
  const killer=vm.runInContext(`unitName(unitMap.get(${ev.attacker.unitId}))`,context);
- assert.ok(fate().startsWith('Destroyed ')&&fate().includes(' by '+killer+' (missile'),'Fate line names the killer: '+fate());
+ assert.ok(fate().startsWith('Destroyed ')&&fate().includes(' by '+killer+' (missile'),'Fate line names the killer: '+fate());vm.runInContext('showKillSource=false;lastPanelKey="";',context);
  elem('unitFate').onclick();assert.equal(vm.runInContext("centerOn",context),ev.unitId,'Clicking the fate line centers on the unit');assert.ok(Math.abs(vm.runInContext("time",context)-(ev.t-1))<1e-9);
  elem('follow').onchange();
  vm.runInContext("selected=21;lastPanelKey='';draw();",context);assert.equal(fate(),'','Survivors have no fate line: '+fate());}
@@ -320,5 +321,41 @@ vm.runInContext("load(m29)",context);
  vm.runInContext("captureMode=false;load(m29);",context);}{const fade=(t,play)=>vm.runInContext("replay.sections=[200];captureMode=false;playing="+play+";time="+t+";cutFade()",context);
  assert.strictEqual(fade(100,true),0,'No fade far from a cut');assert.ok(fade(200,true)>0.99,'Black at the cut while playing');assert.ok(fade(200.5,true)>0&&fade(200.5,true)<1,'Fades back in after the cut');assert.ok(fade(199.5,true)>0,'Fades out before the cut');assert.strictEqual(fade(200,false),0,'No fade when paused on a cut (section jump)');
  vm.runInContext("playing=false;replay.sections=[];",context);}
+{ // Hovering a marker shows its name tag even when its label category is off; leaving clears it.
+  vm.runInContext("captureMode=false;playing=false;time=Math.min(300,replay.duration/2);draw();",context);
+  const m=vm.runInContext("markers.find(m=>!nameplateOn(m.u))||markers[0]",context);
+  if(m){const cv=elem('canvas');
+    cv.onpointermove({clientX:m.x,clientY:m.y});assert.equal(vm.runInContext('hoverId',context),m.u.id,'Pointer over a marker sets the hover unit');
+    cv.onpointermove({clientX:m.x+500,clientY:m.y+500});assert.equal(vm.runInContext('hoverId',context),null,'Pointer away clears the hover unit');
+    cv.onpointermove({clientX:m.x,clientY:m.y});cv.onpointerleave();assert.equal(vm.runInContext('hoverId',context),null,'Leaving the canvas clears the hover unit');}
+}
+{ // Smart unit scaling: each axis of a parent's marker is fitted to the box holding the parent and its components, never smaller than the normal marker.
+  vm.runInContext("showComponents=true;smartScale=true",context);
+  const found=vm.runInContext("(()=>{for(const [id] of partsOf){const u=unitMap.get(id),b=u&&partSpan(u);if(b&&Math.max(...b.hi.map((h,i)=>h-b.lo[i]))>5)return {id};}return null;})()",context);
+  if(found){
+    const at=ppm=>JSON.stringify(vm.runInContext(`scaleToParts(unitMap.get(${found.id}),0,${ppm})`,context)),big=JSON.parse(at(50));
+    assert.ok(big.every(([a])=>a>=1)&&big.some(([a])=>a>1),'Zoomed in, a vehicle with spread-out components is stretched: '+at(50));
+    assert.equal(at(0.0001),'[[1,0],[1,0],[1,0]]','Zoomed out the marker keeps its normal size');
+    vm.runInContext("showComponents=false",context);assert.equal(at(50),JSON.stringify(big),'Hiding the component markers does not change the fit');vm.runInContext("showComponents=true",context);
+    vm.runInContext("smartScale=false",context);assert.equal(at(50),'[[1,0],[1,0],[1,0]]','No fit when Smart unit scaling is off');vm.runInContext("smartScale=true",context);
+    assert.equal(JSON.stringify(vm.runInContext(`partSpan(unitMap.get(${found.id}))`,context)),JSON.stringify(vm.runInContext(`partSpan(unitMap.get(${found.id}))`,context)),'The span is static');
+  }
+}
+{ // Picking a unit in the Unit Tracker list switches Follow pilot to Follow selected (and leaves other camera modes alone).
+  const pick=()=>{elem('unitSearch').value='';vm.runInContext("renderSearch()",context);const li=elem('unitResults').children[0];li.onclick();};
+  elem('follow').value='player';pick();assert.equal(elem('follow').value,'selected','Tracker pick switches Follow pilot to Follow selected');
+  elem('follow').value='off';pick();assert.equal(elem('follow').value,'off','Other camera modes are left alone');
+  elem('follow').value='player';
+}
+{ // Ships keep a minimum width of 20% of their length even when every component lies along the hull.
+  const r=JSON.parse(vm.runInContext("(()=>{units.push({id:-9002,recordedLabel:'LAND AEGIS',tracks:{position:[[0,0,0,0,0]],quaternion:[[0,0,0,0.01,0.99995,0]],state:[]},startTime:0,iconType:'BuildingParent',iconTypeCode:5});const u=units.at(-1);partsOf.set(u.id,[{tracks:{position:[[0,200,0,0,0]]}},{tracks:{position:[[0,-200,0,0,0]]}}]);spanCache.delete(u.id);smartScale=true;shapeCache.delete(u.id);const r=scaleToParts(u,0,1);const s=groundShape(u);partsOf.delete(u.id);units.pop();return JSON.stringify({r,s});})()",context));
+  assert.equal(r.s,'ship');const len=r.r[0][0]*26,wid=r.r[1][0]*10;assert.ok(wid>=0.2*len-1e-6,'Ship width is at least 20% of its length: '+wid+' vs '+len);
+}
+{ // A one-sided component layout (all behind and either side of the origin) must move the marker box, not just stretch it symmetrically.
+  vm.runInContext("units.push({id:-9001,tracks:{position:[[0,0,0,0,0]],quaternion:[[0,0,0,0,1,0]],state:[]},startTime:0,iconType:'Air',iconTypeCode:1})",context);
+  const fit=JSON.parse(vm.runInContext("(()=>{const u=units.at(-1);partsOf.set(u.id,[{tracks:{position:[[0,-129,55,16,0]]}}]);spanCache.delete(u.id);smartScale=true;const r=scaleToParts(u,0,1);partsOf.delete(u.id);units.pop();return JSON.stringify(r);})()",context));
+  const x=fit[0],noseX=10*x[0]+x[1],tailX=-6*x[0]+x[1];
+  assert.ok(Math.abs(tailX+129)<1e-6&&Math.abs(noseX-129)<1e-6,'An aircraft marker is centred on the unit and reaches its furthest component each way: nose '+noseX+' tail '+tailX);
+}
 const result={status:'passed',method:'Node DOM/canvas simulation',checks:['sample loads','play/pause changes clock','scrub updates events','reset restores start','another exported recording loads','altitude and corrected Y projection','top-down toggle','orbit and zoom','target ID selection and designation changes','pilot centered throughout playback and zoom','formation separation','selected aircraft follow and whole-mission release'],note:'Browser rendering not visually verified; local-file navigation was blocked by browser policy.'};
 fs.writeFileSync(path.join(__dirname,'viewer-validation.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));

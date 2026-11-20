@@ -46,17 +46,25 @@ def in_flight(rows):
     return rows[start:end]
 
 
-ACCEL_MISSILE = 0.15   # a missile's speed grows by at least this fraction over its flight; gun/cannon rounds hold a constant speed
+SHORT_FLIGHT = 1.0        # seconds
+BOMB_DROP_METERS = 100.0  # a bomb falls at least this far over its flight
+GUN_MUZZLE_SPEED = 750.0  # m/s; gun rounds start at ~850-1600, missiles launch at ~60-700 (measured on Missions 2, 4, 23, 25)
+ACCEL_MISSILE = 0.15  # a missile's speed grows by at least this fraction over its flight; gun/cannon rounds hold a constant speed
 
 
 def weapon_of(f):
     """'missile' if the in-flight projectile accelerates (rocket motor), else 'gun'. Flight time is a poor test: a missile
     fired at close range can hit in under 2 s. Falls back to flight time only when there are too few samples to measure speed."""
     sp = [sum((p - q) ** 2 for p, q in zip(a[1:], b[1:])) ** 0.5 / (b[0] - a[0]) for a, b in zip(f, f[1:]) if b[0] > a[0]]
+    if sp and f[-1][0] - f[0][0] < SHORT_FLIGHT and sp[0] >= GUN_MUZZLE_SPEED:
+        return 'gun'   # a short flight that starts at gun speed is a gun round; its later speed jumps are sampling noise. A short missile starts slow and accelerates.
     if len(sp) >= 3:
         n = max(1, len(sp) // 3)
         first, last = sum(sp[:n]) / n, sum(sp[-n:]) / n
-        return 'missile' if (last - first) / max(first, 1.0) >= ACCEL_MISSILE else 'gun'
+        if (last - first) / max(first, 1.0) >= ACCEL_MISSILE:
+            return 'missile'
+        # slow, falling from height and not a gun burst: dropped ordnance (XSDB guided bomb = one projectile; SFFS = a line of them)
+        return 'bomb' if sp[0] < GUN_MUZZLE_SPEED and f[0][3] - f[-1][3] >= BOMB_DROP_METERS else 'gun'
     return 'gun' if f[-1][0] - f[0][0] < 2 else 'missile'
 
 
@@ -103,6 +111,45 @@ def victim_position(victim, t, event):
     return event.get('position')
 
 
+GUN_BURST_ROUNDS = 3      # a gun kill needs at least this many other gun rounds from the same shooter ...
+GUN_BURST_WINDOW = 2.0    # ... launched within this many seconds of the killing round
+
+
+def start_speed(f):
+    return math.dist(f[0][1:], f[1][1:]) / max(f[1][0] - f[0][0], 1e-6)
+
+
+def nearest_shooter(units, first, exclude_id):
+    """(distance, unit) of the unit nearest a projectile's first sample [t, x, y, z], or None."""
+    shooter = None
+    for u in units:
+        if u['startTime'] > first[0] or u['id'] == exclude_id:
+            continue
+        p = unit_position(u, first[0])
+        if not p or p == [0, 0, 0]:
+            continue
+        d = math.dist(p, first[1:])
+        if shooter is None or d < shooter[0]:
+            shooter = (d, u)
+    return shooter
+
+
+def gun_burst(units, shooter, pid0, t0, gun_starts, victim_id):
+    """True if the shooter also launched GUN_BURST_ROUNDS or more gun-class rounds within GUN_BURST_WINDOW seconds of t0."""
+    lo = bisect.bisect_left(gun_starts, (t0 - GUN_BURST_WINDOW,))
+    hi = bisect.bisect_left(gun_starts, (t0 + GUN_BURST_WINDOW + 1e-6,))
+    n = 0
+    for t, pos, pid in gun_starts[lo:hi]:
+        if pid == pid0:
+            continue
+        s = nearest_shooter(units, [t, *pos], victim_id)
+        if s and s[0] <= MAX_LAUNCH and s[1] is shooter:
+            n += 1
+            if n >= GUN_BURST_ROUNDS:
+                return True
+    return False
+
+
 def attribute(doc, projs, fire=None):
     units = [u for u in doc['units'] if u['tracks']['position'] and u['iconType'] in VEHICLE_TYPES]
     by_id = {u['id']: u for u in units}
@@ -115,6 +162,7 @@ def attribute(doc, projs, fire=None):
         event.pop('attacker', None)   # re-derive everything; stale attributions from an older rule must not survive
     flights = [(pid, rows, in_flight(rows)) for pid, rows in projs]
     flights = [x for x in flights if len(x[2]) >= 2]
+    gun_starts = sorted((rows[0][0], rows[0][1:], pid) for pid, rows, f in flights if weapon_of(f) == 'gun')   # launch time and position of every gun-class round
     found = 0
     for event in doc['events']:
         if event.get('type') != 'destroyed' or event['unitId'] not in victims:
@@ -144,21 +192,15 @@ def attribute(doc, projs, fire=None):
         if not best:
             continue
         _, miss, pid, rows, f, gap = best
-        shooter = None
-        for u in units:
-            if u['startTime'] > rows[0][0] or u['id'] == victim['id']:
-                continue
-            p = unit_position(u, rows[0][0])
-            if not p or p == [0, 0, 0]:
-                continue
-            d = math.dist(p, rows[0][1:])
-            if shooter is None or d < shooter[0]:
-                shooter = (d, u)
+        shooter = nearest_shooter(units, rows[0], victim['id'])
         if not shooter or shooter[0] > MAX_LAUNCH:
             continue
+        weapon = weapon_of(f)
+        if weapon == 'gun' and start_speed(f) < GUN_MUZZLE_SPEED and not gun_burst(units, shooter[1], pid, rows[0][0], gun_starts, victim['id']):
+            continue   # a lone slow round with no gun burst around it is not evidence of a gun firing: leave the kill unattributed
         event['attacker'] = {
             'unitId': shooter[1]['id'],
-            'weapon': weapon_of(f),
+            'weapon': weapon,
             'projectileId': pid,
             'missDistance': round(miss, 1),
             'launchDistance': round(shooter[0], 1),
@@ -199,7 +241,7 @@ def mark_collateral(doc, by_id):
                 'afterVictimId': prior['unitId'], 'distanceToEarlierKill': round(d), 'secondsAfter': round(event['t'] - prior['t'], 1),
             }
 
-FIRE_AFTER_SECONDS = 1.0    # a round fired just before release can still land this long after the burst ends
+FIRE_AFTER_SECONDS = 1.5    # bullet travel time: a round fired just before release can still land 1.5-2 s after the burst ends
 FIRE_AIM_DEGREES = 10.0     # nose-to-victim angle needed while the trigger was down (weak or no projectile match)
 FIRE_AIM_DECENT_DEGREES = 5.0
 

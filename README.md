@@ -1,4 +1,4 @@
-# ACE COMBAT 8 tactical replay viewer
+﻿# ACE COMBAT 8 tactical replay viewer
 
 A browser viewer for the post-mission tactical replay in ACE COMBAT 8 (the radar-style view with moving aircraft markers).
 It reads the replay save files the game already writes, converts them to JSON, and plays them back with a 3D wireframe view,
@@ -29,7 +29,7 @@ Mission numbers follow the game's mission numbering: **Mission number = Mission 
 - **Camera dropdown:** Whole mission, Follow pilot, Dynamic (combat) (fits the combat-relevant area), Dynamic (target)
   (frames the selected aircraft and a locked target), Follow selected.
 - **Top left:** *Unit Info* (details for the selected unit, with Lock), *Unit Tracker* (search units, see their kills, who
-  destroyed them and how many missiles and bombs they fired; the kill list is a timeline by default, or cumulative counts by type or label; clicking a kill jumps to 1 s before it and centres on the target), *Display Settings* (show projectiles, on by default and including the player's firing line; show components such as a ship's guns and missile cells, track component kills such as AA guns and turrets, and which units get name labels).
+  destroyed them and how many missiles and bombs they fired; the kill list is a timeline by default, or cumulative counts by type or label; clicking a kill jumps to 1 s before it and centres on the target), *Display Settings* (show projectiles, on by default and including the player's firing line; show components such as a ship's guns and missile cells, track component kills such as AA guns and turrets, *Smart unit scaling* (stretches a vehicle's marker, per axis, to reach its furthest components, on by default), and which units get name labels; *Experimental: Kill source* shows the inferred weapon type (gun, missile, bomb) next to kills, off by default because the save records no weapon type).
 - **Capture:** draw a framing rectangle, set start/end markers and copy a command for the offline video renderer (optionally with a 3D orbit: one turn per 30 s of footage)
   (see `RUNBOOK.md`).
 - **Replay selector** (top right): switches between the replays listed in `replays.json`.
@@ -87,3 +87,4 @@ The replay does not track kills. It stores positions, health, a destroyed flag, 
 | `video-tools/` | Offline (headless) video renderer. |
 
 No game files, executables, archives or encryption keys are included. The sample JSON files contain only extracted replay telemetry.
+

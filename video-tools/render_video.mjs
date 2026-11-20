@@ -2,7 +2,7 @@
 // Steps replay time frame by frame (speed/fps seconds of replay per video frame), screenshots the viewer's own canvas
 // in headless Edge/Chrome, and pipes the frames to ffmpeg. No real-time dependence, no visible browser window.
 //
-//   node render_video.mjs ..\Replay3.json [--speed 20] [--fps 30] [--size 800x800] [--view 3d|top] [--crop 0.8] [--camera whole|dynamic|player|selected|target --unit id [--target lockedId]] [--plates player,wingmen,...] [--missiles] [--components] [--component-kills] [--orbit 30] [--frame x0,y0,x1,y1] [--yaw deg --elevation deg] [--zoom z]
+//   node render_video.mjs ..\Replay3.json [--speed 20] [--fps 30] [--size 800x800] [--view 3d|top] [--crop 0.8] [--camera whole|dynamic|player|selected|target --unit id [--target lockedId]] [--plates player,wingmen,...] [--missiles] [--components] [--component-kills] [--no-smart-scale] [--orbit 30] [--frame x0,y0,x1,y1] [--yaw deg --elevation deg] [--zoom z]
 //                         [--from 0] [--to 2067.9] [--out out.mp4] [--crf 24] [--browser path\to\msedge.exe]
 import fs from 'node:fs';
 import os from 'node:os';
@@ -74,7 +74,7 @@ try {
   await page.setViewport({ width: W + 280, height: H + 181, deviceScaleFactor: 1 });
   await page.goto(pathToFileURL(pagePath).href, { waitUntil: 'load', timeout: 300000 });
   await page.waitForFunction('window.replayApi', { timeout: 300000 });
-  const size = await page.evaluate(`replayApi.setup(${JSON.stringify({ view, speed, crop, follow: camera, unit: unitId, lockTarget, plates, missiles: args.includes('--missiles'), components: args.includes('--components'), componentKills: args.includes('--component-kills'), orbit, frame, yaw, elevation, zoom })})`);
+  const size = await page.evaluate(`replayApi.setup(${JSON.stringify({ view, speed, crop, follow: camera, unit: unitId, lockTarget, plates, missiles: args.includes('--missiles'), components: args.includes('--components'), componentKills: args.includes('--component-kills'), smartScale: !args.includes('--no-smart-scale'), orbit, frame, yaw, elevation, zoom })})`);
   if (size.w !== W || size.h !== H) console.warn(`Canvas is ${size.w}x${size.h}, expected ${W}x${H}; output uses the canvas size.`);
   const duration = await page.evaluate('replayApi.duration()');
   const from = Number(opt('from', 0)), to = Math.min(Number(opt('to', duration)), duration);

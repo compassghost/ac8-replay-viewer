@@ -89,6 +89,7 @@ Main options:
 | `--missiles` | Show projectiles. |
 | `--components` | Show components (a ship's guns, missile cells, turrets) as small markers. |
 | `--component-kills` | Also credit kills of components and structures (AA guns, SAMs, ship guns, turrets, parts). |
+| `--no-smart-scale` | Draw every marker at its normal size. By default a vehicle's marker is stretched, per axis, to reach its furthest components. |
 | `--orbit S` | Orbit the 3D camera around the target (the followed unit, or the view centre): one full turn per S seconds of **footage**, so `--orbit 30` turns once per 30 s of video whatever the replay speed. Needs `--view 3d`; ignores `--frame`. The Capture panel's **3D orbit** option adds `--orbit 30`. |
 | `--plates a,b,...` | Label groups: `player,wingmen,namedAllies,alliedUnits,namedEnemies,enemyUnits` (or `none`). |
 | `--size WxH` | Output size, at most 800x800. Default is 800x450 (16:9); a drawn frame keeps its own ratio. |
