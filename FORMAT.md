@@ -177,3 +177,26 @@ Probed on Mission ID 29 (Replay3, 309 attributed missile kills) and Mission ID 3
 ## Missiles and bombs fired (`fire` in the JSON)
 
 Projectile objects carry no weapon type (every one has identical header fields) and no owner. `add_missiles.py` therefore infers, per unit: the shooter is the unit nearest the projectile's first sample (within 60 m); a projectile that accelerates is a missile. Gun rounds (constant speed) are deliberately **not counted**: there are thousands, the counts are unreliable, and the player's own gun rounds are recorded in some missions (Mission 4) but not in others (Missions 1 and 2). A **bomb** is a projectile that releases children: projectiles that start away from every unit but within 60 m of another projectile in flight (or one that ended up to 0.3 s earlier) are its submunitions, and a parent with two or more of them counts as one bomb (SOD in Mission 4 releases 3 to 5 each). Submunitions are not counted as separate missiles. Bombs cannot be told from missiles by their flight path (the SOD parent is powered), and a plain bomb with no children would be counted as a missile. `fire[unitId] = {m: [missile launch times], b: [[bomb time, children], ...]}`. The player's missiles and bombs are recorded (Mission 23).
+
+## Moon 11 railgun, UAV APS shield and laser (observations, 2026-11; INCONCLUSIVE)
+
+Observed in M29 and M26 only. These are patterns in the data, not decoded fields, and the sample sizes are small. Nothing in the export or the viewer uses them.
+
+- **Railgun (Moon 11).** Her projectiles include slugs at 7,300-11,900 m/s that fly 2.0-2.75 s and are sampled only 2-4 times, always in salvos of three about 0.3 s apart. Two speed families recur: about 11.3-11.9 km/s and about 7.3-8.1 km/s (M29: 2:31.0, 3:52.2, 5:35.1, 5:52.6; M26: 12:19.1, 12:22.1, 12:39.7, plus two at 9:54). In M26 she is the aircraft labelled `Unknown` (the game has not identified her yet); the same triples and speeds make the match likely, not certain. Her other projectiles are NPC missiles that cap at 833 m/s but can fly up to 13.5 s.
+- **UAVs** (`ESCORT UAV` in M29, `UNKNOWN UAV` in M26) have no projectiles and no fire records, only the usual health/destroy records. Their state mask toggles between 67 and 75, i.e. bit 3 (value 8), which is otherwise unexplained.
+- **Possible APS shield.** Missiles that end 25-60 m from a UAV, a consistent radius of about 50 m: M29 41 cases (38 with UAV bit 3 clear), M26 12 cases (8 clear). The first M29 case is at 0:26.1, three wingman missiles within 0.2 s.
+- **Possible laser takedown.** Missiles that end mid-air before 7 s, at least 150 m from any unit and within 2 km of a UAV: M29 11 cases (8 with bit 3 set, e.g. four missiles ending together at 2:06.2-2:06.4), M26 7 cases (7 with bit 3 set).
+- **Possible meaning of bit 3:** clear = shield up, set = laser active. Supported by both missions but not proven; the M26 shield cases are only 8 of 12.
+- **Type 120** records (32 bytes, 20-30 per second) exist only on Moon's child unit (M29 id 20681, 0:00-0:22) and on the X-40 nose unit's `LASER DESIGNATOR` child (M29 id 22105, from about 7:39). The payload contains a constant triple (-10.26, -9.63, 5.65) and varying fields that are not decoded; the link to lasers is a guess.
+- **Not found:** any record that names a missile's fate (shot down by APS or laser); the fate is inferred only from where and when the missile ends.
+### Projectile channel 6, follow-up tests (2026-11; negative results)
+
+Checked against projectiles with a known shooter, victim and (for the player) weapon, in M26, M28, M29 and M30. Channel 6 holds records `(kind byte, category byte, 16-bit value)` with kind 0, 1 or 2.
+
+- **Presence:** missiles and bombs have channel 6; gun rounds (990 wingman rounds in M29) and railgun slugs (12) have none. This separates guided from unguided projectiles and nothing finer.
+- **Kind 2 (first record on most missiles):** the same `(category, value)` for every shooter in a mission, whatever the weapon: M29 `(2,144)` for the player's MSL and HCAA, Moon's missiles and the wingmen's; M28 `(2,33)`; M26 `(2,39)`; M30 `(2,135)` for MSL and XSDB alike. It is not a shooter ID or a weapon ID.
+- **Kind 1 (repeated about 20 s apart):** not a victim ID or victim type. M30 has 27 distinct values over 97 kills, M28 153 over 307, M26 38 over 78; one value maps to several victim labels (for example `(192,14440)` is SLCM, MSL DISPENSER, MARKER UAV and unlabelled targets) and every label has many values.
+- **Kind 0:** almost unique per victim (M30 64 distinct values for 64 victims); possibly an instance hash, not decoded.
+- **Other per-projectile records:** type 37 (4 bytes at spawn, often 0.0 or a time a few seconds before launch), type 38 (impact position as 3 doubles in cm plus vectors and a counter) and type 39 (4 bytes) do not hold the shooter, victim or weapon either.
+
+Conclusion so far: nothing on a projectile names its model. The weapon of a player launch comes from the weapon-cycle presses (types 71/69); for NPC projectiles only the flight (speed, acceleration, lifetime) and the shooter type tell them apart.
